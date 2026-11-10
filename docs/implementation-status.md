@@ -20,3 +20,7 @@ Plan: docs/superpowers/plans/2026-11-11-dreambusta-vue.md
 - Task 2: complete — streamed uploads, preserved originals, MD/TXT/WBook/PDF, media Range, DOC converter adapter and native PPTX parser; full suite 35/35 PASS.
 - Ruling: PPTX uses the actual DreamAgent Desktop parser and static Vue scene renderer because LibreOffice is absent. Warn about unsupported objects/animation. Original retained; DOC requires installed converter. This enables local slide viewing now with less fidelity for complex decks than Office PDF conversion.
 - Ruling: TechHelper DOCX source is vendored as an isolated React 18 readOnly island in Vue. Standalone builds do not depend on E:/DA paths.
+- Task 3: complete — bounded public HTTP adapter with DNS pinning/redirect validation, Buildin main-article block extraction, TechHelper published JSON, raster snapshot resources and manual refresh/revocation policy. 3 source unit tests + live anonymous Buildin example PASS.
+- Task 4–5: implemented, browser verification in progress. Vue catalogue/collections/editor forms/viewers/reader use real persistent API; no demo materials in working data directory.
+- Browser finding: Vite string proxy shorthand changes Host. Replaced with explicit changeOrigin:false; origin/CSRF protection remains enabled.
+- Regression: DOCX empty text must retain visual representation; processor uses raw WBook DOCX extractor without book text validation. Office tests PASS.
