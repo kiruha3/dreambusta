@@ -1,0 +1,110 @@
+import { createServer } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { Store } from './store.ts';
+import { getSession, hashPassword, verifyPassword, login, logout } from './auth.ts';
+import type { Material } from '../shared/types.ts';
+
+export class HttpError extends Error { status: number; constructor(status: number, message: string) { super(message); this.status = status; } }
+export function json(res: ServerResponse, status: number, data: unknown) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
+export async function readJson(req: IncomingMessage) {
+  let n = 0; const parts: Buffer[] = [];
+  for await (const chunk of req) { n += chunk.length; if (n > 1024 * 1024) throw new HttpError(413, 'Слишком большой запрос'); parts.push(chunk); }
+  try { return JSON.parse(Buffer.concat(parts).toString() || '{}'); } catch { throw new HttpError(400, 'Некорректный JSON'); }
+}
+function editable(body: Record<string, unknown>): Partial<Material> {
+  const p: Partial<Material> = {};
+  for (const key of ['title', 'author', 'description', 'slug'] as const) if (key in body) {
+    if (typeof body[key] !== 'string' || (body[key] as string).length > (key === 'description' ? 10000 : 300)) throw new HttpError(400, 'Проверьте длину и формат полей');
+    p[key] = (body[key] as string).trim();
+  }
+  if ('title' in p && !p.title) throw new HttpError(400, 'Укажите название');
+  for (const key of ['visible', 'downloadable'] as const) if (key in body) { if (typeof body[key] !== 'boolean') throw new HttpError(400, 'Ожидалось логическое значение'); p[key] = body[key]; }
+  if ('tags' in body) { if (!Array.isArray(body.tags) || body.tags.length > 30 || body.tags.some(x => typeof x !== 'string' || x.length > 100)) throw new HttpError(400, 'Проверьте теги'); p.tags = body.tags; }
+  return p;
+}
+export function publicMaterial(m: Material, summary = false) {
+  const { files, ...data } = m;
+  return { ...data, files: Object.fromEntries(Object.entries(files).map(([key, { name, mime, size }]) => [key, { name, mime, size }])), ...(summary ? { paragraphs: [], html: '' } : {}) };
+}
+export function createApp({ dataDir }: { dataDir: string }) {
+  const store = new Store(dataDir);
+  const attempts = new Map<string, { count: number; time: number }>();
+  const server = createServer(async (req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'same-origin'); res.setHeader('Cache-Control', 'no-store');
+    try {
+      const url = new URL(req.url || '/', 'http://localhost');
+      const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent); const method = req.method || 'GET';
+      if (parts[0] !== 'api') throw new HttpError(404, 'Не найдено');
+      const session = getSession(store, req); const editor = !!session; const closed = store.setting('closed') === 'true';
+      const setupRequired = !store.db.prepare('SELECT 1 FROM users LIMIT 1').get();
+      const mutate = !['GET', 'HEAD'].includes(method);
+      if (mutate && req.headers.origin) {
+        const origin = new URL(req.headers.origin);
+        if (origin.host !== req.headers.host || !['http:', 'https:'].includes(origin.protocol)) throw new HttpError(403, 'Чужой источник запроса');
+      }
+      if (parts[1] === 'session' && method === 'GET') return json(res, 200, { setupRequired, editor, closed, ...session });
+      if (['setup', 'login'].includes(parts[1]) && method === 'POST') {
+        if (parts[1] === 'setup') {
+          if (!setupRequired) throw new HttpError(409, 'Редактор уже создан');
+          if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '')) throw new HttpError(403, 'Создайте первого редактора с этого компьютера');
+          const host = (req.headers.host || '').split(':')[0];
+          if (!['localhost', '127.0.0.1', '['].includes(host)) throw new HttpError(403, 'Откройте localhost для первоначальной настройки');
+        }
+        const key = req.socket.remoteAddress || ''; const old = attempts.get(key); const current = old && old.time > Date.now() - 600000 ? old : { count: 0, time: Date.now() };
+        if (++current.count > 20) throw new HttpError(429, 'Слишком много попыток. Повторите через 10 минут');
+        if (attempts.size > 1000) attempts.clear(); attempts.set(key, current);
+        const body = await readJson(req); const email = String(body.email || '').trim().toLowerCase(); const password = body.password;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || typeof password !== 'string' || password.length < 12 || password.length > 256) throw new HttpError(400, 'Нужны email и пароль длиной от 12 до 256 символов');
+        if (parts[1] === 'setup') store.db.prepare('INSERT INTO users VALUES (?,?)').run(email, hashPassword(password));
+        else {
+          const user = store.db.prepare('SELECT hash FROM users WHERE email=?').get(email);
+          if (!user || !verifyPassword(password, user.hash as string)) throw new HttpError(401, 'Неверный email или пароль');
+        }
+        attempts.delete(key);
+        return json(res, parts[1] === 'setup' ? 201 : 200, login(store, req, res, email));
+      }
+      if (mutate) {
+        if (!editor) throw new HttpError(401, 'Войдите как редактор');
+        if (req.headers['x-csrf-token'] !== session.csrf) throw new HttpError(403, 'Обновите страницу: проверка сессии не пройдена');
+      } else if (closed && !editor) throw new HttpError(401, 'Библиотека доступна после входа');
+      if (parts[1] === 'logout' && method === 'POST') { logout(store, req, res); return json(res, 200, { ok: true }); }
+      if (parts[1] === 'settings') {
+        if (!editor) throw new HttpError(401, 'Войдите как редактор');
+        if (method === 'PATCH') { const b = await readJson(req); if (typeof b.closed !== 'boolean') throw new HttpError(400, 'Некорректная настройка'); store.setSetting('closed', String(b.closed)); }
+        return json(res, 200, { closed: store.setting('closed') === 'true' });
+      }
+      if (parts[1] === 'materials') {
+        if (!parts[2]) {
+          if (method === 'GET') return json(res, 200, store.listMaterials().filter(m => editor || m.visible).map(m => publicMaterial(m, true)));
+          if (method === 'POST') { const b = await readJson(req); const p = editable(b); if (!p.title) throw new HttpError(400, 'Укажите название'); return json(res, 201, publicMaterial(store.createMaterial({ ...p, title: p.title, kind: 'document', source: { type: 'file' } }))); }
+        }
+        const m = store.resolveMaterial(parts[2]);
+        if (!editor && !m.visible) throw new HttpError(404, 'Материал не найден');
+        if (parts[3] === 'file') throw new HttpError(404, 'Файл не найден');
+        if (method === 'GET') return json(res, 200, publicMaterial(m));
+        if (method === 'PATCH') return json(res, 200, publicMaterial(store.updateMaterial(m.id, editable(await readJson(req)))));
+        if (method === 'DELETE') { store.deleteMaterial(m.id); return json(res, 200, { ok: true }); }
+      }
+      if (parts[1] === 'collections') {
+        if (method === 'GET') {
+          const list = parts[2] ? [store.resolveCollection(parts[2])] : store.listCollections();
+          const filtered = list.filter(c => editor || c.visible).map(c => ({ ...c, materialIds: c.materialIds.filter(id => { try { return editor || store.resolveMaterial(id).visible; } catch { return false; } }) }));
+          if (parts[2] && !filtered[0]) throw new HttpError(404, 'Подборка не найдена');
+          return json(res, 200, parts[2] ? filtered[0] : filtered);
+        }
+        if (method === 'DELETE' && parts[2]) { store.deleteCollection(store.resolveCollection(parts[2]).id); return json(res, 200, { ok: true }); }
+        if (method === 'POST' || method === 'PATCH') {
+          const b = await readJson(req); const p = editable(b);
+          if (!p.title || !Array.isArray(b.materialIds) || b.materialIds.length > 1000 || b.materialIds.some((x: unknown) => typeof x !== 'string')) throw new HttpError(400, 'Укажите название и список материалов');
+          return json(res, method === 'POST' ? 201 : 200, store.saveCollection({ ...p, title: p.title, materialIds: b.materialIds, id: parts[2] ? store.resolveCollection(parts[2]).id : undefined }));
+        }
+      }
+      throw new HttpError(404, 'Не найдено');
+    } catch (err) {
+      if (res.headersSent) { res.destroy(); return; }
+      const message = err instanceof Error ? err.message : 'Ошибка сервера';
+      json(res, err instanceof HttpError ? err.status : /не найден/i.test(message) ? 404 : 400, { error: message });
+    }
+  });
+  return { server, store };
+}
