@@ -24,3 +24,9 @@ Plan: docs/superpowers/plans/2026-11-11-dreambusta-vue.md
 - Task 4–5: implemented, browser verification in progress. Vue catalogue/collections/editor forms/viewers/reader use real persistent API; no demo materials in working data directory.
 - Browser finding: Vite string proxy shorthand changes Host. Replaced with explicit changeOrigin:false; origin/CSRF protection remains enabled.
 - Regression: DOCX empty text must retain visual representation; processor uses raw WBook DOCX extractor without book text validation. Office tests PASS.
+- Task 4: complete — actual Vue catalogue, collections, protected editor, uploads/link/article forms, metadata/visibility/cover/settings and source management; browser CRUD workflow PASS.
+- Task 5: complete — PDF worker/canvas, TechHelper React readOnly Word, static native slides, media, WBook focus/hold/keys/virtual text/word selection/local progress; browser PDF scan/Word table/ordered PPTX/large book/WAV PASS.
+- Task 6: in progress — 42/42 unit/HTTP tests, vue-tsc and Vite production build PASS. Browser workflow and anonymous Buildin smoke PASS. Independent review pending.
+- Security regression: delayed setup body previously allowed a second first editor; reproduced with a held HTTP request, fixed by transactional recheck. Vite supplies actual client address so LAN clients cannot bootstrap via loopback proxy. Origin checking retained.
+- Ruling: legacy WBook data/URLs/progress are not migrated because the copied project intentionally contains no personal library. Historical sources remain in baseline. A separate migration would be needed to preserve old installations' URLs.
+- Ruling: initial TechHelper native documents use saved article structure (including tables); published PDF previews are stored separately. No private original URL is fetched. Exact rich editor fidelity and SSO require further integration against real sample shares.
