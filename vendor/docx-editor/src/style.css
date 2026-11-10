@@ -1,0 +1,534 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius: 0.5rem;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+/* Comments panel slide-in animation */
+@keyframes comments-panel-slide-in {
+  from {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    width: 320px;
+    overflow: visible;
+  }
+}
+
+/* Base styles */
+@layer base {
+:root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(222.2 84% 4.9%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(222.2 84% 4.9%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(222.2 84% 4.9%);
+    --primary: hsl(222.2 47.4% 11.2%);
+    --primary-foreground: hsl(210 40% 98%);
+    --secondary: hsl(210 40% 96.1%);
+    --secondary-foreground: hsl(222.2 47.4% 11.2%);
+    --muted: hsl(210 40% 96.1%);
+    --muted-foreground: hsl(215.4 16.3% 46.9%);
+    --accent: hsl(210 40% 96.1%);
+    --accent-foreground: hsl(222.2 47.4% 11.2%);
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(210 40% 98%);
+    --border: hsl(214.3 31.8% 91.4%);
+    --input: hsl(214.3 31.8% 91.4%);
+    --ring: hsl(222.2 84% 4.9%);
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: hsl(222.2 84% 4.9%);
+    --foreground: hsl(210 40% 98%);
+    --card: hsl(222.2 84% 4.9%);
+    --card-foreground: hsl(210 40% 98%);
+    --popover: hsl(222.2 84% 4.9%);
+    --popover-foreground: hsl(210 40% 98%);
+    --primary: hsl(210 40% 98%);
+    --primary-foreground: hsl(222.2 47.4% 11.2%);
+    --secondary: hsl(217.2 32.6% 17.5%);
+    --secondary-foreground: hsl(210 40% 98%);
+    --muted: hsl(217.2 32.6% 17.5%);
+    --muted-foreground: hsl(215 20.2% 65.1%);
+    --accent: hsl(217.2 32.6% 17.5%);
+    --accent-foreground: hsl(210 40% 98%);
+    --destructive: hsl(0 62.8% 30.6%);
+    --destructive-foreground: hsl(210 40% 98%);
+    --border: hsl(217.2 32.6% 17.5%);
+    --input: hsl(217.2 32.6% 17.5%);
+    --ring: hsl(212.7 26.8% 83.9%);
+  }
+
+  * {
+    @apply border-border;
+}
+body {
+    @apply bg-background text-foreground;
+  }
+}
+
+#app {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+#react-root {
+  width: 100%;
+}
+
+/* ========================================
+   Floating UI surfaces (toolbars, popovers)
+   ========================================
+   Opaque surface for floating menus, kept consistent with lib.css (embed). Uses
+   literal colors so floating menus stay reliable regardless of how the host
+   provides --popover/--background tokens. Dark mode follows the `.dark`
+   ancestor. */
+.docx-floating-surface {
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+.dark .docx-floating-surface {
+  /* Нейтральный near-black zinc в тон тёмной теме хоста (shadcn --background
+     ≈ hsl(240 10% 3.9%)). Раньше был slate-800 #1e293b — светлее и заметно
+     синее фона редактора, попап читался «синим». */
+  background-color: #18181b;
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Version-history cards + chips (HistoryPopover). Literal opaque colors, kept
+   consistent with lib.css (embed) — host-token-independent so cards stay opaque
+   regardless of how the host supplies --primary/--accent/--destructive. */
+.docx-version-card {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+.docx-version-card:not([class*="docx-version-card--"]):hover {
+  background-color: #f1f5f9;
+}
+.docx-version-card--latest {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+.docx-version-card--a {
+  background-color: #fef2f2;
+  border-color: #f87171;
+}
+.docx-version-card--b {
+  background-color: #f0fdf4;
+  border-color: #4ade80;
+}
+.docx-version-chip {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.docx-version-chip--latest {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+.dark .docx-version-card {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.dark .docx-version-card:not([class*="docx-version-card--"]):hover {
+  background-color: #27272a;
+}
+.dark .docx-version-card--latest {
+  /* Нейтральный zinc в тон surface, «Последняя» выделяется рамкой, а не синим фоном. */
+  background-color: #27272a;
+  border-color: #52525b;
+}
+.dark .docx-version-card--a {
+  background-color: #450a0a;
+  border-color: #b91c1c;
+}
+.dark .docx-version-card--b {
+  background-color: #052e16;
+  border-color: #15803d;
+}
+.dark .docx-version-chip {
+  background-color: #27272a;
+  color: #a1a1aa;
+}
+.dark .docx-version-chip--latest {
+  background-color: #52525b;
+  color: #e4e4e7;
+}
+
+/* Read-only плашка редактора (Bug 44) — литеральные цвета, host-независимо;
+   бордер задан здесь (в embed нет preflight, Tailwind `border-b` не сработал бы). */
+.docx-readonly-bar {
+  background-color: #f8fafc;
+  color: #64748b;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+.dark .docx-readonly-bar {
+  background-color: #1e293b;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   Notion-style UI Styles
+   ======================================== */
+
+/* Bubble Menu Animations */
+@keyframes bubble-menu-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes slash-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Notion-style Block Hover Effects */
+.notion-mode [data-slate-node="element"] {
+  position: relative;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.notion-mode [data-slate-node="element"]:hover {
+  background-color: rgba(55, 53, 47, 0.04);
+}
+
+.dark .notion-mode [data-slate-node="element"]:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Block selection indicator */
+.notion-mode [data-slate-node="element"]::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0;
+  background-color: var(--primary);
+  border-radius: 2px;
+  transition: height 0.15s ease;
+  opacity: 0;
+}
+
+.notion-mode [data-slate-node="element"]:focus-within::before,
+.notion-mode [data-slate-node="element"].selected::before {
+  height: 100%;
+  opacity: 1;
+}
+
+/* Placeholder text for empty blocks */
+.notion-mode [data-slate-node="element"]:not(:focus-within):empty::after,
+.notion-mode .empty-block::after {
+  content: "Введите текст или нажмите / для команд";
+  color: var(--muted-foreground);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Headings styling in Notion mode */
+.notion-mode [data-slate-node="element"][data-type="heading-one"] {
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+}
+
+.notion-mode [data-slate-node="element"][data-type="heading-two"] {
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+}
+
+.notion-mode [data-slate-node="element"][data-type="heading-three"] {
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+}
+
+/* List styling */
+.notion-mode [data-type="bulleted-list"],
+.notion-mode [data-type="numbered-list"] {
+  padding-left: 1.5em;
+}
+
+.notion-mode [data-type="list-item"] {
+  padding: 0.1em 0;
+}
+
+/* Quote styling */
+.notion-mode [data-type="block-quote"] {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--muted-foreground);
+}
+
+/* Code block styling */
+.notion-mode [data-type="code-block"] {
+  background-color: var(--muted);
+  border-radius: 4px;
+  padding: 1em;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+}
+
+/* Divider styling */
+.notion-mode [data-type="divider"] {
+  height: 1px;
+  background-color: var(--border);
+  margin: 1.5em 0;
+}
+
+/* Table styling in Notion mode */
+.notion-mode table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.notion-mode th,
+.notion-mode td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.notion-mode th {
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+/* Smooth scrollbar */
+.notion-mode::-webkit-scrollbar {
+  width: 10px;
+}
+
+.notion-mode::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notion-mode::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.notion-mode::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
+/* Focus styles for Notion mode */
+.notion-mode:focus {
+  outline: none;
+}
+
+.notion-mode [data-slate-editor]:focus {
+  outline: none;
+}
+
+/* ========================================
+   Template Variables - friendly for lawyers
+   ======================================== */
+
+/* Template variable pill styling */
+.template-variable {
+  display: inline;
+  position: relative;
+  cursor: help;
+}
+
+/* Make {{ and }} less visible - show only variable name prominently */
+.template-variable::before,
+.template-variable::after {
+  opacity: 0.3;
+  font-size: 0.7em;
+  vertical-align: middle;
+}
+
+/* Alternative: CSS to style brackets within the text */
+/* Since we can't modify inner text with CSS alone, we use JS styling in leaves.tsx */
+
+/* Variable highlight animation when scrolling to variable */
+@keyframes variable-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.3);
+  }
+}
+
+.template-variable.variable-highlight,
+.variable-highlight {
+  animation: variable-pulse 0.8s ease-in-out 3 !important;
+  background-color: rgba(59, 130, 246, 0.35) !important;
+  border-color: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Radix ScrollArea keeps the same 14px hit area as native app scrollbars. */
+.docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb, rgb(0 0 0 / 28%));
+}
+
+.docx-scrollbar:hover .docx-scrollbar-thumb,
+.docx-scrollbar:active .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb-hover, rgb(0 0 0 / 48%));
+}
+
+.dark .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb, rgb(255 255 255 / 30%));
+}
+
+.dark .docx-scrollbar:hover .docx-scrollbar-thumb,
+.dark .docx-scrollbar:active .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb-hover, rgb(255 255 255 / 56%));
+}
+
+/* Global native scrollbars for the standalone DOCX editor application. */
+:root {
+  --app-scrollbar-hit-size: 14px;
+  --app-scrollbar-thumb-size: 6px;
+  --app-scrollbar-thumb-size-hover: 10px;
+  --app-scrollbar-padding: calc(
+    (var(--app-scrollbar-hit-size) - var(--app-scrollbar-thumb-size)) / 2
+  );
+  --app-scrollbar-padding-hover: calc(
+    (var(--app-scrollbar-hit-size) - var(--app-scrollbar-thumb-size-hover)) / 2
+  );
+  --app-scrollbar-radius: 999px;
+  --app-scrollbar-track: transparent;
+  --app-scrollbar-track-hover: rgb(0 0 0 / 4%);
+  --app-scrollbar-thumb: rgb(0 0 0 / 28%);
+  --app-scrollbar-thumb-hover: rgb(0 0 0 / 48%);
+  --app-scrollbar-firefox-track: rgb(0 0 0 / 12%);
+  --app-scrollbar-firefox-track-hover: rgb(0 0 0 / 18%);
+  --app-scrollbar-firefox-thumb: rgb(0 0 0 / 56%);
+  --app-scrollbar-firefox-thumb-hover: rgb(0 0 0 / 72%);
+}
+
+.dark {
+  --app-scrollbar-track-hover: rgb(255 255 255 / 6%);
+  --app-scrollbar-thumb: rgb(255 255 255 / 30%);
+  --app-scrollbar-thumb-hover: rgb(255 255 255 / 56%);
+  --app-scrollbar-firefox-track: rgb(255 255 255 / 14%);
+  --app-scrollbar-firefox-track-hover: rgb(255 255 255 / 20%);
+  --app-scrollbar-firefox-thumb: rgb(255 255 255 / 58%);
+  --app-scrollbar-firefox-thumb-hover: rgb(255 255 255 / 76%);
+}
+
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: var(--app-scrollbar-firefox-thumb)
+      var(--app-scrollbar-firefox-track);
+  }
+
+  *:hover {
+    scrollbar-color: var(--app-scrollbar-firefox-thumb-hover)
+      var(--app-scrollbar-firefox-track-hover);
+  }
+}
+
+@supports selector(::-webkit-scrollbar) {
+  *:not(#techhelper-scrollbar-specificity-bump) {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar {
+    width: var(--app-scrollbar-hit-size) !important;
+    height: var(--app-scrollbar-hit-size) !important;
+    background-color: var(--app-scrollbar-track) !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-track {
+    background: var(--app-scrollbar-track) !important;
+    border-radius: var(--app-scrollbar-radius) !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-track:hover {
+    background: var(--app-scrollbar-track-hover) !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-thumb {
+    min-width: var(--app-scrollbar-hit-size) !important;
+    min-height: var(--app-scrollbar-hit-size) !important;
+    border: var(--app-scrollbar-padding) solid transparent !important;
+    border-radius: var(--app-scrollbar-radius) !important;
+    background: var(--app-scrollbar-thumb) !important;
+    background-clip: content-box !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:hover,
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:active {
+    border-width: var(--app-scrollbar-padding-hover) !important;
+    background: var(--app-scrollbar-thumb-hover) !important;
+    background-clip: content-box !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  *:not(#techhelper-scrollbar-specificity-bump)::-webkit-scrollbar-corner {
+    background: transparent !important;
+  }
+}
+
+@media (forced-colors: active), (hover: none), (pointer: coarse) {
+  * {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+}

@@ -1,0 +1,5 @@
+export { openPptx } from './read.ts'
+export { createPptx } from './create.ts'
+export { writePptx } from './write.ts'
+export type { PptxDocument } from './types.ts'
+export { EMU_PER_PIXEL } from './geometry.ts'

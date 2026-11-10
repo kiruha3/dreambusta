@@ -1,0 +1,15 @@
+.app {
+  border: 2px solid #61dafb;
+  border-radius: 8px;
+}
+
+.app h1 {
+  color: #61dafb;
+  margin: 0 0 10px 0;
+}
+
+.app p {
+  margin: 0;
+  color: #333;
+}
+

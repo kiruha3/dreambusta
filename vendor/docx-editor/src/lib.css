@@ -1,0 +1,496 @@
+/* CSS для ВСТРАИВАНИЯ редактора как библиотеки (build:lib → docx-editor.css).
+ *
+ * В отличие от src/style.css (полный app-CSS с `@import "tailwindcss"` =
+ * preflight + base + :root/.dark + body), здесь НАМЕРЕННО:
+ *  - НЕТ preflight (глобальный reset сломал бы стили host-приложения,
+ *    например cli-gateway, у которого свой CSS, не Tailwind);
+ *  - НЕТ переопределения :root/.dark токенов и глобальных `*`/`body` —
+ *    цвета берутся из токенов host'а (cli-gateway/frontend_shadcn задают
+ *    --background/--foreground/... сами, тех же имён);
+ *  - ЕСТЬ Tailwind theme + сгенерированные утилиты (тулбар: flex/gap/h-…) +
+ *    компонентные стили редактора (.notion-mode, .template-variable).
+ *
+ * Подключается из src/index.ts (lib-entry). App-entry main.tsx по-прежнему
+ * тянет полный style.css.
+ */
+/* The host declares docx-editor below its utilities. Late library utilities
+ * must not override host responsive classes; editor surfaces stay unlayered. */
+@layer theme, docx-editor, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(docx-editor);
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius: 0.5rem;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+/* Comments panel slide-in animation */
+@keyframes comments-panel-slide-in {
+  from {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    width: 320px;
+    overflow: visible;
+  }
+}
+
+/* ========================================
+   Floating UI surfaces (toolbars, popovers)
+   ========================================
+   Opaque surface for floating menus (selection toolbar, slash menu, variable
+   popover, radix popover/tooltip/dropdown). Uses LITERAL colors on purpose:
+   in embed mode `bg-popover` resolves to `var(--popover)`, and the host
+   (cli-gateway/frontend_shadcn) provides raw HSL components (`0 0% 100%`) that
+   are invalid as a bare `background-color` → the menu rendered transparent and
+   document text bled through. This class is host-token-independent. It is left
+   unlayered so it wins over the (broken) `bg-*` utilities in the utilities
+   layer; dark mode follows the host's `.dark` ancestor. */
+.docx-floating-surface {
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+.dark .docx-floating-surface {
+  /* Нейтральный near-black zinc в тон тёмной теме хоста (shadcn --background
+     ≈ hsl(240 10% 3.9%)). Раньше был slate-800 #1e293b — светлее и заметно
+     синее фона редактора, попап читался «синим». */
+  background-color: #18181b;
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Version-history cards + chips (HistoryPopover). Literal opaque colors, same
+   rationale as .docx-floating-surface: in embed the host may supply
+   --primary/--accent/--destructive as raw HSL components, which break
+   `color-mix()`/bare-color usage → cards rendered transparent and document text
+   bled through. Host-token-independent, unlayered so they beat bg-* utilities. */
+.docx-version-card {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+.docx-version-card:not([class*="docx-version-card--"]):hover {
+  background-color: #f1f5f9;
+}
+.docx-version-card--latest {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+.docx-version-card--a {
+  background-color: #fef2f2;
+  border-color: #f87171;
+}
+.docx-version-card--b {
+  background-color: #f0fdf4;
+  border-color: #4ade80;
+}
+.docx-version-chip {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.docx-version-chip--latest {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+.dark .docx-version-card {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.dark .docx-version-card:not([class*="docx-version-card--"]):hover {
+  background-color: #27272a;
+}
+.dark .docx-version-card--latest {
+  /* Нейтральный zinc в тон surface, «Последняя» выделяется рамкой, а не синим фоном. */
+  background-color: #27272a;
+  border-color: #52525b;
+}
+.dark .docx-version-card--a {
+  background-color: #450a0a;
+  border-color: #b91c1c;
+}
+.dark .docx-version-card--b {
+  background-color: #052e16;
+  border-color: #15803d;
+}
+.dark .docx-version-chip {
+  background-color: #27272a;
+  color: #a1a1aa;
+}
+.dark .docx-version-chip--latest {
+  background-color: #52525b;
+  color: #e4e4e7;
+}
+
+/* Read-only плашка редактора (Bug 44) — литеральные цвета, host-независимо;
+   бордер задан здесь (в embed нет preflight, Tailwind `border-b` не сработал бы). */
+.docx-readonly-bar {
+  background-color: #f8fafc;
+  color: #64748b;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+.dark .docx-readonly-bar {
+  background-color: #1e293b;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   Notion-style UI Styles
+   ======================================== */
+
+/* Bubble Menu Animations */
+@keyframes bubble-menu-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes slash-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Notion-style Block Hover Effects */
+.notion-mode [data-slate-node="element"] {
+  position: relative;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.notion-mode [data-slate-node="element"]:hover {
+  background-color: rgba(55, 53, 47, 0.04);
+}
+
+.dark .notion-mode [data-slate-node="element"]:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Block selection indicator */
+.notion-mode [data-slate-node="element"]::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0;
+  background-color: var(--primary);
+  border-radius: 2px;
+  transition: height 0.15s ease;
+  opacity: 0;
+}
+
+.notion-mode [data-slate-node="element"]:focus-within::before,
+.notion-mode [data-slate-node="element"].selected::before {
+  height: 100%;
+  opacity: 1;
+}
+
+/* Placeholder text for empty blocks */
+.notion-mode [data-slate-node="element"]:not(:focus-within):empty::after,
+.notion-mode .empty-block::after {
+  content: "Введите текст или нажмите / для команд";
+  color: var(--muted-foreground);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Headings styling in Notion mode */
+.notion-mode [data-slate-node="element"][data-type="heading-one"] {
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+}
+
+.notion-mode [data-slate-node="element"][data-type="heading-two"] {
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+}
+
+.notion-mode [data-slate-node="element"][data-type="heading-three"] {
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+}
+
+/* List styling */
+.notion-mode [data-type="bulleted-list"],
+.notion-mode [data-type="numbered-list"] {
+  padding-left: 1.5em;
+}
+
+.notion-mode [data-type="list-item"] {
+  padding: 0.1em 0;
+}
+
+/* Quote styling */
+.notion-mode [data-type="block-quote"] {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--muted-foreground);
+}
+
+/* Code block styling */
+.notion-mode [data-type="code-block"] {
+  background-color: var(--muted);
+  border-radius: 4px;
+  padding: 1em;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+}
+
+/* Divider styling */
+.notion-mode [data-type="divider"] {
+  height: 1px;
+  background-color: var(--border);
+  margin: 1.5em 0;
+}
+
+/* Table styling in Notion mode */
+.notion-mode table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.notion-mode th,
+.notion-mode td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.notion-mode th {
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+/* Smooth scrollbar */
+.notion-mode::-webkit-scrollbar {
+  width: 10px;
+}
+
+.notion-mode::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notion-mode::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.notion-mode::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
+/* Focus styles for Notion mode */
+.notion-mode:focus {
+  outline: none;
+}
+
+.notion-mode [data-slate-editor]:focus {
+  outline: none;
+}
+
+/* ========================================
+   Template Variables
+   ======================================== */
+.template-variable {
+  display: inline;
+  position: relative;
+  cursor: help;
+}
+
+.template-variable::before,
+.template-variable::after {
+  opacity: 0.3;
+  font-size: 0.7em;
+  vertical-align: middle;
+}
+
+@keyframes variable-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.3);
+  }
+}
+
+.template-variable.variable-highlight,
+.variable-highlight {
+  animation: variable-pulse 0.8s ease-in-out 3 !important;
+  background-color: rgba(59, 130, 246, 0.35) !important;
+  border-color: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Radix ScrollArea keeps the same 14px hit area as native app scrollbars. */
+.docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb, rgb(0 0 0 / 28%));
+}
+
+.docx-scrollbar:hover .docx-scrollbar-thumb,
+.docx-scrollbar:active .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb-hover, rgb(0 0 0 / 48%));
+}
+
+.dark .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb, rgb(255 255 255 / 30%));
+}
+
+.dark .docx-scrollbar:hover .docx-scrollbar-thumb,
+.dark .docx-scrollbar:active .docx-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb-hover, rgb(255 255 255 / 56%));
+}
+
+/* Native scroll areas are scoped to the embedded editor, never to its host. */
+.docx-editor-root {
+  --docx-scrollbar-hit-size: 14px;
+  --docx-scrollbar-thumb-size: 6px;
+  --docx-scrollbar-thumb-size-hover: 10px;
+  --docx-scrollbar-padding: calc(
+    (var(--docx-scrollbar-hit-size) - var(--docx-scrollbar-thumb-size)) / 2
+  );
+  --docx-scrollbar-padding-hover: calc(
+    (var(--docx-scrollbar-hit-size) - var(--docx-scrollbar-thumb-size-hover)) / 2
+  );
+  --docx-scrollbar-radius: 999px;
+  --docx-scrollbar-track: transparent;
+  --docx-scrollbar-track-hover: rgb(0 0 0 / 4%);
+  --docx-scrollbar-thumb: rgb(0 0 0 / 28%);
+  --docx-scrollbar-thumb-hover: rgb(0 0 0 / 48%);
+  --docx-scrollbar-firefox-track: rgb(0 0 0 / 12%);
+  --docx-scrollbar-firefox-track-hover: rgb(0 0 0 / 18%);
+  --docx-scrollbar-firefox-thumb: rgb(0 0 0 / 56%);
+  --docx-scrollbar-firefox-thumb-hover: rgb(0 0 0 / 72%);
+}
+
+.dark .docx-editor-root {
+  --docx-scrollbar-track-hover: rgb(255 255 255 / 6%);
+  --docx-scrollbar-thumb: rgb(255 255 255 / 30%);
+  --docx-scrollbar-thumb-hover: rgb(255 255 255 / 56%);
+  --docx-scrollbar-firefox-track: rgb(255 255 255 / 14%);
+  --docx-scrollbar-firefox-track-hover: rgb(255 255 255 / 20%);
+  --docx-scrollbar-firefox-thumb: rgb(255 255 255 / 58%);
+  --docx-scrollbar-firefox-thumb-hover: rgb(255 255 255 / 76%);
+}
+
+@supports (-moz-appearance: none) {
+  .docx-editor-root,
+  .docx-editor-root * {
+    scrollbar-width: auto;
+    scrollbar-color: var(--docx-scrollbar-firefox-thumb)
+      var(--docx-scrollbar-firefox-track);
+  }
+
+  .docx-editor-root:hover,
+  .docx-editor-root *:hover {
+    scrollbar-color: var(--docx-scrollbar-firefox-thumb-hover)
+      var(--docx-scrollbar-firefox-track-hover);
+  }
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump),
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump) {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar {
+    width: var(--docx-scrollbar-hit-size) !important;
+    height: var(--docx-scrollbar-hit-size) !important;
+    background: var(--docx-scrollbar-track) !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-track,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-track {
+    background: var(--docx-scrollbar-track) !important;
+    border-radius: var(--docx-scrollbar-radius) !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-track:hover,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-track:hover {
+    background: var(--docx-scrollbar-track-hover) !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb {
+    min-width: var(--docx-scrollbar-hit-size) !important;
+    min-height: var(--docx-scrollbar-hit-size) !important;
+    border: var(--docx-scrollbar-padding) solid transparent !important;
+    border-radius: var(--docx-scrollbar-radius) !important;
+    background: var(--docx-scrollbar-thumb) !important;
+    background-clip: content-box !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:hover,
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:active,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:hover,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-thumb:active {
+    border-width: var(--docx-scrollbar-padding-hover) !important;
+    background: var(--docx-scrollbar-thumb-hover) !important;
+    background-clip: content-box !important;
+  }
+
+  .docx-editor-root:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-button,
+  .docx-editor-root *:not(#docx-scrollbar-specificity-bump)::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+@media (forced-colors: active), (hover: none), (pointer: coarse) {
+  .docx-editor-root,
+  .docx-editor-root * {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+}

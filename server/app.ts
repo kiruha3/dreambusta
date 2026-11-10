@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Store } from './store.ts';
 import { getSession, hashPassword, verifyPassword, login, logout } from './auth.ts';
 import type { Material } from '../shared/types.ts';
+import { upload, serveFile } from './uploads.ts';
 
 export class HttpError extends Error { status: number; constructor(status: number, message: string) { super(message); this.status = status; } }
 export function json(res: ServerResponse, status: number, data: unknown) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
@@ -68,6 +69,7 @@ export function createApp({ dataDir }: { dataDir: string }) {
         if (req.headers['x-csrf-token'] !== session.csrf) throw new HttpError(403, 'Обновите страницу: проверка сессии не пройдена');
       } else if (closed && !editor) throw new HttpError(401, 'Библиотека доступна после входа');
       if (parts[1] === 'logout' && method === 'POST') { logout(store, req, res); return json(res, 200, { ok: true }); }
+      if (parts[1] === 'uploads' && method === 'POST') return json(res, 201, publicMaterial(await upload(req, store, dataDir, url.searchParams.get('name') || '')));
       if (parts[1] === 'settings') {
         if (!editor) throw new HttpError(401, 'Войдите как редактор');
         if (method === 'PATCH') { const b = await readJson(req); if (typeof b.closed !== 'boolean') throw new HttpError(400, 'Некорректная настройка'); store.setSetting('closed', String(b.closed)); }
@@ -80,7 +82,8 @@ export function createApp({ dataDir }: { dataDir: string }) {
         }
         const m = store.resolveMaterial(parts[2]);
         if (!editor && !m.visible) throw new HttpError(404, 'Материал не найден');
-        if (parts[3] === 'file') throw new HttpError(404, 'Файл не найден');
+        if (parts[3] === 'file' && ['GET', 'HEAD'].includes(method)) return serveFile(req, res, m, parts[4], dataDir, editor);
+        if (parts[3] === 'version' && method === 'POST') return json(res, 200, publicMaterial(await upload(req, store, dataDir, url.searchParams.get('name') || '', m)));
         if (method === 'GET') return json(res, 200, publicMaterial(m));
         if (method === 'PATCH') return json(res, 200, publicMaterial(store.updateMaterial(m.id, editable(await readJson(req)))));
         if (method === 'DELETE') { store.deleteMaterial(m.id); return json(res, 200, { ok: true }); }

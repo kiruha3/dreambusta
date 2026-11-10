@@ -15,3 +15,8 @@ Plan: docs/superpowers/plans/2026-11-11-dreambusta-vue.md
 
 - Task 1: in progress — tests written before implementation.
 - Task 2–6: pending.
+
+- Task 1: complete — persistent store + auth/CSRF/visibility; 17/17 targeted tests. Commit e264867.
+- Task 2: complete — streamed uploads, preserved originals, MD/TXT/WBook/PDF, media Range, DOC converter adapter and native PPTX parser; full suite 35/35 PASS.
+- Ruling: PPTX uses the actual DreamAgent Desktop parser and static Vue scene renderer because LibreOffice is absent. Warn about unsupported objects/animation. Original retained; DOC requires installed converter. This enables local slide viewing now with less fidelity for complex decks than Office PDF conversion.
+- Ruling: TechHelper DOCX source is vendored as an isolated React 18 readOnly island in Vue. Standalone builds do not depend on E:/DA paths.
