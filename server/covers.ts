@@ -33,16 +33,20 @@ export async function saveCover(
   const relative = `covers/${randomUUID()}`;
   mkdirSync(join(dataDir, "covers"), { recursive: true });
   writeFileSync(join(dataDir, relative), data);
-  return store.updateMaterial(m.id, {
-    cover: "cover",
-    files: {
-      ...m.files,
-      cover: {
-        path: relative,
-        mime,
-        size,
-        name: "cover." + mime.split("/")[1],
+  return store.updateMaterial(
+    m.id,
+    {
+      cover: "cover",
+      files: {
+        ...m.files,
+        cover: {
+          path: relative,
+          mime,
+          size,
+          name: "cover." + mime.split("/")[1],
+        },
       },
     },
-  });
+    m.revision,
+  );
 }

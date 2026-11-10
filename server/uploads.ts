@@ -8,11 +8,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Store } from "./store.ts";
+import {
+  MaterialConflictError,
+  DuplicateMaterialError,
+  type Store,
+} from "./store.ts";
 import type { Material } from "../shared/types.ts";
 import { extension, fileLimit, mediaTypes, processFile } from "./processing.ts";
 import { HttpError } from "./app.ts";
@@ -37,12 +41,14 @@ export async function upload(
   const dir = join(dataDir, "files", dirName);
   mkdirSync(dir, { recursive: true });
   let size = 0;
+  const hash = createHash("sha256");
   try {
     await pipeline(
       req,
       new Transform({
         transform(chunk, _enc, cb) {
           size += chunk.length;
+          hash.update(chunk);
           cb(
             size > limit ? new HttpError(413, "Превышен размер файла") : null,
             chunk,
@@ -68,18 +74,25 @@ export async function upload(
       } as Record<string, string>
     )[ext] ||
     "application/octet-stream";
-  let m =
-    existing ||
-    store.createMaterial({
-      title: name.replace(/\.(fb2\.zip|[^.]+)$/i, ""),
-      kind: "document",
-      source: { type: "file" },
-      state: "processing",
-    });
   const files = {
-    original: { path: relative, name, mime, size },
+    original: { path: relative, name, mime, size, sha256: hash.digest("hex") },
   } as Material["files"];
   if (existing?.files.cover) files.cover = existing.files.cover;
+  let m: Material;
+  try {
+    m =
+      existing ||
+      store.createMaterial({
+        title: name.replace(/\.(fb2\.zip|[^.]+)$/i, ""),
+        kind: "document",
+        source: { type: "file" },
+        state: "processing",
+        files,
+      });
+  } catch (err) {
+    rmSync(dir, { recursive: true, force: true });
+    throw err;
+  }
   try {
     let file = new File(
       mediaTypes[ext]
@@ -111,16 +124,25 @@ export async function upload(
     }
     if (ext === "pdf") files.pdf = files.original;
     if (ext === "docx") files.docx = files.original;
-    m = store.updateMaterial(m.id, {
-      ...processed,
-      title: existing?.title || processed.title!,
-      source: { type: "file" },
-      files,
-      textVersion: existing ? existing.textVersion + 1 : 1,
-    });
+    m = store.updateMaterial(
+      m.id,
+      {
+        ...processed,
+        title: existing?.title || processed.title!,
+        source: { type: "file" },
+        files,
+        textVersion: existing ? existing.textVersion + 1 : 1,
+      },
+      existing?.revision,
+    );
   } catch (err) {
     if (existing) {
       rmSync(dir, { recursive: true, force: true });
+      if (
+        err instanceof MaterialConflictError ||
+        err instanceof DuplicateMaterialError
+      )
+        throw err;
       throw new HttpError(
         400,
         `Новая версия не принята; предыдущая сохранена. ${err instanceof Error ? err.message : "Ошибка обработки"}`,

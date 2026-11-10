@@ -1,12 +1,12 @@
 # DreamBusta Vue Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Собрать локально работающую библиотеку по согласованным макетам: каталог, подборки, загрузка/ссылки, просмотр и чтение, управление.
 
 **Architecture:** Vue 3 SPA и отдельный Node HTTP API; SQLite и файлы в игнорируемом data/. WBook импортёры и алгоритмы остаются общими TypeScript-модулями; UI переводится на Vue. Источники имеют отдельные адаптеры; сохранённые публикации обновляются вручную.
 
-**Tech Stack:** Vue 3, TypeScript, Vite, Vue Router, Tailwind 4, reka-ui/shadcn-style components, Node 24, SQLite, filesystem, PDF.js, WBook/JSZip, Chromium для сложных публичных страниц.
+**Tech Stack:** Vue 3, TypeScript, Vite, Vue Router, Tailwind 4, компоненты в стиле TechHelper, Node 24, SQLite, filesystem, PDF.js, WBook/JSZip, Chromium для браузерных проверок. Публичные статьи Buildin/TechHelper импортируются через API/HTML-адаптеры без браузерного scraper.
 
 **Spec:** ../specs/2026-11-11-dreambusta-library-design.md и ../specs/2026-11-11-dreambusta-screens-design.md; пользователь после макетов утвердил Vue 3 и отдельный локальный Git в dreambusta.
 
@@ -34,10 +34,10 @@
 
 **Interfaces:** Material с source/representations; Store создаёт/обновляет/разрешает material/collection по slug и alias; createApp({dataDir}) возвращает HTTP server. API /api/session, /api/setup, /api/login, /api/logout, /api/materials, /api/collections, /api/settings. Публичная выдача фильтрует visibility; мутации требуют session+CSRF.
 
-- [ ] Написать и запустить падающие тесты сохранения/slug/авторизации/перезапуска.
-- [ ] Реализовать SQLite store, сессии, маршруты и проверки доступа.
-- [ ] Запустить тесты Task 1 и существующие unit-тесты WBook.
-- [ ] Коммит Task 1.
+- [x] Написать и запустить падающие тесты сохранения/slug/авторизации/перезапуска.
+- [x] Реализовать SQLite store, сессии, маршруты и проверки доступа.
+- [x] Запустить тесты Task 1 и существующие unit-тесты WBook.
+- [x] Коммит Task 1.
 
 ## Task 2: Загрузка файлов, текст и представления
 
@@ -45,10 +45,10 @@
 
 **Interfaces:** processFile(path,name) возвращает metadata/paragraphs/html/pdf/scene/states; upload сохраняет оригинал потоково, регистрирует материал и запускает обработку. GET /api/materials/:id/file/:representation проверяет доступ и поддерживает Range для медиа. PATCH карточки и POST новой версии сохраняют materialId.
 
-- [ ] Падающие тесты MD/TXT, PDF без текста, неправильных файлов, Range и отказа неавторизованной загрузки.
-- [ ] Подключить импортёры WBook, Markdown, PDF, DOCX readOnly, PPTX; серверную Office-конверсию при наличии LibreOffice.
-- [ ] Проверить реальные fixtures, лимиты и независимые состояния представлений.
-- [ ] Коммит Task 2.
+- [x] Падающие тесты MD/TXT, PDF без текста, неправильных файлов, Range и отказа неавторизованной загрузки.
+- [x] Подключить импортёры WBook, Markdown, PDF, DOCX readOnly, PPTX; серверную Office-конверсию при наличии LibreOffice.
+- [x] Проверить реальные fixtures, лимиты и независимые состояния представлений.
+- [x] Коммит Task 2.
 
 ## Task 3: Внешние источники и ручное обновление
 
@@ -56,10 +56,10 @@
 
 **Interfaces:** resolveLink(url) → source descriptor; importShare(url) → разрешённая publication; POST /api/links/preview, /api/links, /api/materials/:id/refresh; confirmUnavailable отдельно прекращает доступ к сохранённой версии. Buildin сохраняет основную статью, а не всю навигацию.
 
-- [ ] Падающие тесты определения провайдера, сохранённого текста без fetch при чтении, отказа/timeout обновления и явного завершения.
-- [ ] Реализовать адаптеры, проверку внешних URL/редиректов, очистку опубликованного HTML, сохранение разрешённых ресурсов.
-- [ ] Проверить присланный публичный пример Buildin; TechHelper проверять по контракту локального API, без использования паролей Академии.
-- [ ] Коммит Task 3.
+- [x] Падающие тесты определения провайдера, сохранённого текста без fetch при чтении, отказа/timeout обновления и явного завершения.
+- [x] Реализовать адаптеры, проверку внешних URL/редиректов, очистку опубликованного HTML, сохранение разрешённых ресурсов.
+- [x] Проверить присланный публичный пример Buildin; TechHelper проверять по контракту локального API, без использования паролей Академии.
+- [x] Коммит Task 3.
 
 ## Task 4: Vue оболочка, каталог и управление
 
@@ -67,10 +67,10 @@
 
 **Interfaces:** клиент API сохраняет CSRF сессии; роуты /library, /library/:slug, /collections, /collections/:slug, /admin/*. Карточки используют настоящие данные API, а не mockup fixtures. Авторизация не открывает скрытые файлы публично.
 
-- [ ] Проверить падающим browser/API сценарием: добавление MD и появление в каталоге.
-- [ ] Реализовать responsive UI по макетам, поиск/фильтры, формы, видимость, обложки, порядок drag/drop, чистые URL и copy-link.
-- [ ] Проверить CRUD после перезагрузки, неправильный ввод и мобильную ширину.
-- [ ] Коммит Task 4.
+- [x] Проверить падающим browser/API сценарием: добавление MD и появление в каталоге.
+- [x] Реализовать responsive UI по макетам, поиск/фильтры, формы, видимость, обложки, порядок drag/drop, чистые URL и copy-link.
+- [x] Проверить CRUD после перезагрузки, неправильный ввод и мобильную ширину.
+- [x] Коммит Task 4.
 
 ## Task 5: Просмотрщики и читалка Vue
 
@@ -78,20 +78,20 @@
 
 **Interfaces:** доступные режимы происходят из representations. Reader использует lib/reader.ts; прогресс хранится по materialId+textVersion+mode в localStorage. Старая позиция не выдаётся за точное соответствие новой версии.
 
-- [ ] Browser тест выбора текст/скорочтение, сохранения скорости/позиции и PDF без текста.
-- [ ] Реализовать реальные рендеры, PDF worker, картинки/таблицы DOCX, статические PPTX, видео/аудио и текст расшифровки при наличии.
-- [ ] Проверить клавиатуру, жест, длинное слово, мобильные размеры, unmount/отмену устаревшего PDF render.
-- [ ] Коммит Task 5.
+- [x] Browser тест выбора текст/скорочтение, сохранения скорости/позиции и PDF без текста.
+- [x] Реализовать реальные рендеры, PDF worker, картинки/таблицы DOCX, статические PPTX, видео/аудио и текст расшифровки при наличии.
+- [x] Проверить клавиатуру, жест, длинное слово, мобильные размеры, unmount/отмену устаревшего PDF render.
+- [x] Коммит Task 5.
 
 ## Task 6: Проверка, документация и локальный запуск
 
 **Files:** tests/e2e.mjs; README.md; docs/implementation-status.md; scripts/dev.mjs; server/index.ts; AGENTS.md.
 
-- [ ] Полный npm test, npm run typecheck и npm run build; meaningful HTTP/browser сценарии с временной библиотекой.
-- [ ] Запустить локальную библиотеку; открыть во внутреннем браузере. Первый редактор создаётся пользователем, тестовые credentials не сохраняются в рабочую БД.
-- [ ] Независимый code review; исправить критичные/существенные находки и повторить затронутые проверки.
-- [ ] Описать запуск, резервное копирование, переменные, формат данных, фактически проверенные форматы и ограничения конвертера/провайдеров.
-- [ ] Итоговый коммит. Нет push, merge в родительский репозиторий или размещения.
+- [x] Полный npm test, npm run typecheck и npm run build; meaningful HTTP/browser сценарии с временной библиотекой.
+- [x] Запустить локальную библиотеку; запросить открытие во внутреннем браузере (приложение может поставить открытие в очередь). Первый редактор создаётся пользователем, тестовые credentials не сохраняются в рабочую БД.
+- [x] Независимый code review; исправить критичные/существенные находки и повторить затронутые проверки.
+- [x] Описать запуск, резервное копирование, переменные, формат данных, фактически проверенные форматы и ограничения конвертера/провайдеров.
+- [x] Итоговый коммит. Нет push, merge в родительский репозиторий или размещения.
 
 ## Execution ledger
 

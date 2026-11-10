@@ -4,6 +4,21 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Material, Collection } from "../shared/types.ts";
 
+export class MaterialConflictError extends Error {
+  constructor() {
+    super(
+      "Материал изменён другой операцией. Откройте актуальную карточку и повторите действие.",
+    );
+  }
+}
+export class DuplicateMaterialError extends Error {
+  constructor(title: string) {
+    super(
+      `Уже добавлен материал «${title}». Откройте его карточку для изменения или обновления версии.`,
+    );
+  }
+}
+
 const alphabet: Record<string, string> = Object.fromEntries(
   "а:a б:b в:v г:g д:d е:e ё:yo ж:zh з:z и:i й:y к:k л:l м:m н:n о:o п:p р:r с:s т:t у:u ф:f х:kh ц:ts ч:ch ш:sh щ:shch ъ: ы:y ь: э:e ю:yu я:ya"
     .split(" ")
@@ -77,6 +92,7 @@ export class Store {
     input: Pick<Material, "title" | "kind" | "source"> & Partial<Material>,
   ): Material {
     return this.transaction(() => {
+      this.checkDuplicate(input);
       const id = randomUUID();
       const now = new Date().toISOString();
       const m: Material = {
@@ -91,6 +107,7 @@ export class Store {
         files: {},
         warnings: [],
         textVersion: 1,
+        revision: 0,
         state: "ready",
         wordCount: 0,
         ...input,
@@ -105,6 +122,18 @@ export class Store {
       return m;
     });
   }
+  private checkDuplicate(input: Partial<Material>, exceptId?: string) {
+    const hash = input.files?.original?.sha256;
+    const url = input.source?.url;
+    if (!hash && !url) return;
+    const duplicate = this.listMaterials().find(
+      (m) =>
+        m.id !== exceptId &&
+        ((hash && m.files.original?.sha256 === hash) ||
+          (url && m.source.url === url)),
+    );
+    if (duplicate) throw new DuplicateMaterialError(duplicate.title);
+  }
   resolveMaterial(ref: string): Material {
     const row = this.db
       .prepare(
@@ -112,27 +141,35 @@ export class Store {
       )
       .get(ref, ref);
     if (!row) throw new Error("Материал не найден");
-    return JSON.parse(row.data as string);
+    return { revision: 0, ...JSON.parse(row.data as string) };
   }
   listMaterials(): Material[] {
     return this.db
       .prepare("SELECT data FROM materials ORDER BY rowid DESC")
       .all()
-      .map((r) => JSON.parse(r.data as string));
+      .map((r) => ({ revision: 0, ...JSON.parse(r.data as string) }));
   }
-  updateMaterial(id: string, patch: Partial<Material>): Material {
+  updateMaterial(
+    id: string,
+    patch: Partial<Material>,
+    expectedRevision?: number,
+  ): Material {
     return this.transaction(() => {
       const old = this.resolveMaterial(id);
+      if (expectedRevision !== undefined && old.revision !== expectedRevision)
+        throw new MaterialConflictError();
       const m = {
         ...old,
         ...patch,
         id: old.id,
+        revision: old.revision + 1,
         createdAt: old.createdAt,
         updatedAt: new Date().toISOString(),
         slug: patch.slug
           ? this.reserve("material", patch.slug, old.id, true)
           : old.slug,
       };
+      this.checkDuplicate(m, old.id);
       this.db
         .prepare("UPDATE materials SET data=? WHERE id=?")
         .run(JSON.stringify(m), m.id);
@@ -145,15 +182,13 @@ export class Store {
       this.db.prepare("DELETE FROM materials WHERE id=?").run(m.id);
       for (const c of this.listCollections()) {
         if (c.materialIds.includes(m.id))
-          this.db
-            .prepare("UPDATE collections SET data=? WHERE id=?")
-            .run(
-              JSON.stringify({
-                ...c,
-                materialIds: c.materialIds.filter((x) => x !== m.id),
-              }),
-              c.id,
-            );
+          this.db.prepare("UPDATE collections SET data=? WHERE id=?").run(
+            JSON.stringify({
+              ...c,
+              materialIds: c.materialIds.filter((x) => x !== m.id),
+            }),
+            c.id,
+          );
       }
     }); // addresses intentionally remain reserved
   }

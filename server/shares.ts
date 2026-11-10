@@ -3,7 +3,11 @@ import { marked } from "marked";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Store } from "./store.ts";
+import {
+  MaterialConflictError,
+  DuplicateMaterialError,
+  type Store,
+} from "./store.ts";
 import type { Material, Kind } from "../shared/types.ts";
 import { cleanHtml, plainParagraphs } from "./processing.ts";
 import { fetchPublic } from "./sources/network.ts";
@@ -19,6 +23,7 @@ const esc = (s: unknown) =>
   );
 export function resolveLink(value: string) {
   const url = new URL(value);
+  url.hash = "";
   const h = url.hostname.toLowerCase().replace(/^www\./, "");
   if (
     !["http:", "https:"].includes(url.protocol) ||
@@ -74,6 +79,7 @@ export function resolveLink(value: string) {
     throw new Error(
       "Этот источник пока не поддерживается. Используйте TechHelper, Buildin, ссылку на видео или прямой медиафайл.",
     );
+  if (type === "share") url.pathname = url.pathname.replace(/\/$/, "");
   return { url: url.href, provider, kind, embed, type };
 }
 function richHtml(node: any): string {
@@ -167,7 +173,7 @@ export class Shares {
     this.dataDir = dataDir;
     this.get = get;
   }
-  async publication(value: string): Promise<Partial<Material>> {
+  async publication(value: string, atomic = false): Promise<Partial<Material>> {
     const d = resolveLink(value);
     const u = new URL(value);
     let api = value;
@@ -235,6 +241,10 @@ export class Shares {
             };
             visual.push("pdf");
           } catch {
+            if (atomic)
+              throw new Error(
+                "Не удалось сохранить опубликованный PDF. Предыдущая версия целиком сохранена.",
+              );
             warnings.push(
               "Опубликованный PDF недоступен. Сохранён только опубликованный текст, если он есть.",
             );
@@ -313,6 +323,10 @@ export class Shares {
         };
         image.setAttribute("src", `snapshot:${key}`);
       } catch {
+        if (atomic)
+          throw new Error(
+            "Не удалось сохранить изображение публикации. Предыдущая версия целиком сохранена.",
+          );
         image.removeAttribute("src");
         warnings.push(
           "Одно из изображений не удалось сохранить; текст доступен.",
@@ -343,6 +357,12 @@ export class Shares {
   }
   async add(value: string, title?: string) {
     const d = resolveLink(value);
+    const existing = this.store
+      .listMaterials()
+      .find((m) => m.source.url === d.url);
+    if (existing) {
+      throw new DuplicateMaterialError(existing.title);
+    }
     if (d.type === "link")
       return this.store.createMaterial({
         title:
@@ -375,32 +395,41 @@ export class Shares {
     if (m.source.type !== "share" || !m.source.url)
       throw new Error("Материал не является сохранённой публикацией");
     try {
-      const p = await this.publication(m.source.url);
-      return this.store.updateMaterial(m.id, {
-        ...p,
-        files: {
-          ...p.files,
-          ...(m.files.cover ? { cover: m.files.cover } : {}),
+      const p = await this.publication(m.source.url, true);
+      return this.store.updateMaterial(
+        m.id,
+        {
+          ...p,
+          files: {
+            ...p.files,
+            ...(m.files.cover ? { cover: m.files.cover } : {}),
+          },
+          title: m.title,
+          textVersion: m.textVersion + 1,
+          source: {
+            ...m.source,
+            status: "saved",
+            message: "",
+            savedAt: new Date().toISOString(),
+            checkedAt: new Date().toISOString(),
+          },
         },
-        title: m.title,
-        textVersion: m.textVersion + 1,
-        source: {
-          ...m.source,
-          status: "saved",
-          message: "",
-          savedAt: new Date().toISOString(),
-          checkedAt: new Date().toISOString(),
-        },
-      });
+        m.revision,
+      );
     } catch (err) {
-      return this.store.updateMaterial(m.id, {
-        source: {
-          ...m.source,
-          status: (err as any).unavailable ? "unavailable" : "error",
-          message: err instanceof Error ? err.message : "Не удалось обновить",
-          checkedAt: new Date().toISOString(),
+      if (err instanceof MaterialConflictError) throw err;
+      return this.store.updateMaterial(
+        m.id,
+        {
+          source: {
+            ...m.source,
+            status: (err as any).unavailable ? "unavailable" : "error",
+            message: err instanceof Error ? err.message : "Не удалось обновить",
+            checkedAt: new Date().toISOString(),
+          },
         },
-      });
+        m.revision,
+      );
     }
   }
   finishUnavailable(id: string) {

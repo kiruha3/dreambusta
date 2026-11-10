@@ -3,8 +3,9 @@ import { ref, watch, onBeforeUnmount, nextTick } from "vue";
 import * as pdfjs from "pdfjs-dist";
 import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import Icon from "../Icon.vue";
+import { loadViewPosition, saveViewPosition } from "../../lib/view-position";
 pdfjs.GlobalWorkerOptions.workerSrc = worker;
-const props = defineProps<{ src: string }>();
+const props = defineProps<{ src: string; positionKey: string }>();
 const canvas = ref<HTMLCanvasElement>();
 const stage = ref<HTMLElement>();
 const pageNumber = ref(1);
@@ -17,9 +18,14 @@ let task: pdfjs.PDFDocumentLoadingTask | undefined;
 let render: pdfjs.RenderTask | undefined;
 let generation = 0;
 let drawing = 0;
+let ready = false;
 async function paint() {
   const gen = ++drawing;
-  render?.cancel();
+  const previous = render;
+  render = undefined;
+  previous?.cancel();
+  await previous?.promise.catch(() => {});
+  if (gen !== drawing) return;
   if (!pdf || !canvas.value) return;
   const doc = pdf;
   busy.value = true;
@@ -54,9 +60,10 @@ async function paint() {
   }
 }
 watch(
-  () => props.src,
-  async (src) => {
+  () => [props.src, props.positionKey] as const,
+  async ([src]) => {
     const gen = ++generation;
+    ready = false;
     ++drawing;
     render?.cancel();
     await task?.destroy();
@@ -78,8 +85,12 @@ watch(
       }
       pdf = doc;
       pages.value = doc.numPages;
-      pageNumber.value = 1;
+      const saved = loadViewPosition(props.positionKey, doc.numPages);
+      pageNumber.value = saved.page;
+      zoom.value = saved.zoom;
       await nextTick();
+      if (gen !== generation) return;
+      ready = true;
       await paint();
     } catch (e) {
       if (gen === generation) {
@@ -90,11 +101,20 @@ watch(
   },
   { immediate: true },
 );
-watch([pageNumber, zoom], () => void paint());
+watch(
+  [pageNumber, zoom],
+  () => {
+    if (!ready) return;
+    saveViewPosition(props.positionKey, pageNumber.value, zoom.value);
+    void paint();
+  },
+  { flush: "sync" },
+);
 function go(n: number) {
   pageNumber.value = Math.min(pages.value, Math.max(1, Math.floor(n) || 1));
 }
 onBeforeUnmount(() => {
+  ready = false;
   generation++;
   drawing++;
   render?.cancel();

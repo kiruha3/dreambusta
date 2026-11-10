@@ -203,7 +203,11 @@ async function copy() {
           class="reading-article"
           v-html="articleHtml"
         ></article>
-        <PdfViewer v-else-if="mode === 'pdf'" :src="fileUrl(m.id, 'pdf')" />
+        <PdfViewer
+          v-else-if="mode === 'pdf'"
+          :src="fileUrl(m.id, 'pdf')"
+          :position-key="`dreambusta-view:${m.id}:${m.textVersion}:pdf`"
+        />
         <DocxViewer
           v-else-if="mode === 'docx'"
           :src="fileUrl(m.id, 'docx')"
@@ -212,6 +216,7 @@ async function copy() {
         <SlidesViewer
           v-else-if="mode === 'slides'"
           :src="fileUrl(m.id, 'slides')"
+          :position-key="`dreambusta-view:${m.id}:${m.textVersion}:slides`"
         />
         <MediaViewer
           v-else-if="mode === 'video' || mode === 'audio'"

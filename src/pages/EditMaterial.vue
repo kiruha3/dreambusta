@@ -133,12 +133,14 @@ async function refresh() {
 }
 async function finish() {
   if (
+    busy.value ||
     !m.value ||
     !confirm(
       "Завершить обновление? Сохранённые текст и ресурсы станут недоступны. Это действие нельзя отменить через интерфейс.",
     )
   )
     return;
+  busy.value = true;
   try {
     m.value = await send(
       `/materials/${m.value.id}/finish-unavailable`,
@@ -148,6 +150,8 @@ async function finish() {
     notify("Обновление завершено");
   } catch (e) {
     error.value = (e as Error).message;
+  } finally {
+    busy.value = false;
   }
 }
 async function copy() {
@@ -230,9 +234,7 @@ async function copy() {
             {{ m.files.original?.name }}
             <span class="muted"
               >·
-              {{
-                ((m.files.original?.size || 0) / 1024 / 1024).toFixed(2)
-              }}
+              {{ ((m.files.original?.size || 0) / 1024 / 1024).toFixed(2) }}
               МБ</span
             >
           </p>
@@ -291,6 +293,7 @@ async function copy() {
                 v-if="m.source.status === 'unavailable'"
                 class="button danger"
                 type="button"
+                :disabled="busy"
                 @click="finish"
               >
                 Завершить обновление</button

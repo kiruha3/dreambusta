@@ -1,6 +1,10 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { Store } from "./store.ts";
+import {
+  Store,
+  MaterialConflictError,
+  DuplicateMaterialError,
+} from "./store.ts";
 import {
   getSession,
   hashPassword,
@@ -118,8 +122,18 @@ export function createApp({ dataDir }: { dataDir: string }) {
       if (["setup", "login"].includes(parts[1]) && method === "POST") {
         if (parts[1] === "setup") {
           if (!setupRequired) throw new HttpError(409, "Редактор уже создан");
-          const forwardedClient = req.headers['x-dreambusta-client'];
-          if (forwardedClient && (typeof forwardedClient !== 'string' || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(forwardedClient))) throw new HttpError(403, 'Создайте первого редактора с этого компьютера');
+          const forwardedClient = req.headers["x-dreambusta-client"];
+          if (
+            forwardedClient &&
+            (typeof forwardedClient !== "string" ||
+              !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+                forwardedClient,
+              ))
+          )
+            throw new HttpError(
+              403,
+              "Создайте первого редактора с этого компьютера",
+            );
           if (
             !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
               req.socket.remoteAddress || "",
@@ -167,8 +181,11 @@ export function createApp({ dataDir }: { dataDir: string }) {
           );
         if (parts[1] === "setup")
           store.transaction(() => {
-            if (store.db.prepare('SELECT 1 FROM users LIMIT 1').get()) throw new HttpError(409, 'Редактор уже создан');
-            store.db.prepare("INSERT INTO users VALUES (?,?)").run(email, hashPassword(password));
+            if (store.db.prepare("SELECT 1 FROM users LIMIT 1").get())
+              throw new HttpError(409, "Редактор уже создан");
+            store.db
+              .prepare("INSERT INTO users VALUES (?,?)")
+              .run(email, hashPassword(password));
           });
         else {
           const user = store.db
@@ -283,21 +300,20 @@ export function createApp({ dataDir }: { dataDir: string }) {
             (r) => !["article", "text"].includes(r),
           );
           if (paragraphs.length) representations.push("article", "text");
-          store.setSetting(`transcript:${m.id}`, b.markdown);
-          return json(
-            res,
-            200,
-            publicMaterial(
-              store.updateMaterial(m.id, {
-                html,
-                paragraphs,
-                representations,
-                wordCount: paragraphs.join(" ").split(/\s+/).filter(Boolean)
-                  .length,
-                textVersion: m.textVersion + 1,
-              }),
-            ),
+          const updated = store.updateMaterial(
+            m.id,
+            {
+              html,
+              paragraphs,
+              representations,
+              wordCount: paragraphs.join(" ").split(/\s+/).filter(Boolean)
+                .length,
+              textVersion: m.textVersion + 1,
+            },
+            m.revision,
           );
+          store.setSetting(`transcript:${m.id}`, b.markdown);
+          return json(res, 200, publicMaterial(updated));
         }
         if (parts[3] === "transcript" && method === "GET" && editor)
           return json(res, 200, {
@@ -391,11 +407,14 @@ export function createApp({ dataDir }: { dataDir: string }) {
       const message = err instanceof Error ? err.message : "Ошибка сервера";
       json(
         res,
-        err instanceof HttpError
-          ? err.status
-          : /не найден/i.test(message)
-            ? 404
-            : 400,
+        err instanceof MaterialConflictError ||
+          err instanceof DuplicateMaterialError
+          ? 409
+          : err instanceof HttpError
+            ? err.status
+            : /не найден/i.test(message)
+              ? 404
+              : 400,
         { error: message },
       );
     }

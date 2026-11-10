@@ -15,6 +15,7 @@ export interface FileRef {
   name: string;
   mime: string;
   size: number;
+  sha256?: string;
 }
 export interface Material {
   id: string;
@@ -35,6 +36,7 @@ export interface Material {
   files: Record<string, FileRef>;
   warnings: string[];
   textVersion: number;
+  revision: number;
   state: "ready" | "processing" | "error";
   error?: string;
   mediaUrl?: string;

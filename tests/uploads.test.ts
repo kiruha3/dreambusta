@@ -45,6 +45,18 @@ test("uploads persist originals, support media Range, and reject anonymous write
     await (await fetch(base + `/api/materials/${m.id}/file/original`)).text(),
     /Actual document/,
   );
+  const repeated = await fetch(base + "/api/uploads?name=renamed.md", {
+    method: "POST",
+    headers,
+    body: "# Note\n\nActual document text.",
+  });
+  assert.equal(
+    repeated.status,
+    409,
+    "identical content with another filename must not create a duplicate",
+  );
+  assert.match((await repeated.json()).error, /уже добавлен/i);
+  assert.equal(app.store.listMaterials().length, 1);
   const image = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
     "base64",
