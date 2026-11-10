@@ -1,0 +1,28 @@
+[Unit]
+Description=WBook reader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wbook
+Group=wbook
+WorkingDirectory=/opt/wbook/current
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/var/lib/wbook
+Environment=NODE_ENV=production
+Environment=CI=true
+Environment=SITES_RUNTIME_ROOT=/var/lib/wbook/runtime
+Environment=WRANGLER_SEND_METRICS=false
+Environment=CLOUDFLARE_CF_FETCH_ENABLED=false
+ExecStart=/usr/local/bin/node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to /var/lib/wbook/storage --ip 127.0.0.1 --port 8787 --inspector-port 0
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
