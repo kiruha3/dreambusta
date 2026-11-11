@@ -20,6 +20,10 @@ import { cleanHtml, plainParagraphs } from "./processing.ts";
 import { marked } from "marked";
 import { createSourceFetcher } from "./sources/network.ts";
 import { readTrustedSourceOrigins } from "./sources/config.ts";
+import { SearchService } from "./search/service.ts";
+import type { Models } from "./search/models.ts";
+import { LocalModels } from "./search/models.ts";
+import type { SearchQuery } from "../shared/search.ts";
 
 export class HttpError extends Error {
   status: number;
@@ -88,10 +92,25 @@ export function publicMaterial(m: Material, summary = false) {
     ...(summary ? { paragraphs: [], html: "", pages: [] } : {}),
   };
 }
-export function createApp({ dataDir }: { dataDir: string }) {
+export function createApp({
+  dataDir,
+  searchModels,
+}: {
+  dataDir: string;
+  searchModels?: Models | false;
+}) {
   const sourceFetcher = createSourceFetcher(readTrustedSourceOrigins(dataDir));
   const store = new Store(dataDir);
   const shares = new Shares(store, dataDir, sourceFetcher);
+  const search = new SearchService(store, {
+    models:
+      searchModels === false
+        ? new LocalModels({ enabled: false })
+        : searchModels,
+    dataDir,
+  });
+  const answerAttempts = new Map<string, { since: number; count: number }>();
+  let activeAnswers = 0;
   const attempts = new Map<string, { count: number; time: number }>();
   const server = createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -112,6 +131,8 @@ export function createApp({ dataDir }: { dataDir: string }) {
         .prepare("SELECT 1 FROM users LIMIT 1")
         .get();
       const mutate = !["GET", "HEAD"].includes(method);
+      const searchAnswer =
+        parts[1] === "search" && parts[2] === "answer" && method === "POST";
       if (mutate && req.headers.origin) {
         const origin = new URL(req.headers.origin);
         if (
@@ -204,7 +225,7 @@ export function createApp({ dataDir }: { dataDir: string }) {
           login(store, req, res, email),
         );
       }
-      if (mutate) {
+      if (mutate && (!searchAnswer || editor)) {
         if (!editor) throw new HttpError(401, "Войдите как редактор");
         if (req.headers["x-csrf-token"] !== session.csrf)
           throw new HttpError(
@@ -213,6 +234,105 @@ export function createApp({ dataDir }: { dataDir: string }) {
           );
       } else if (closed && !editor)
         throw new HttpError(401, "Библиотека доступна после входа");
+      if (parts[1] === "search" && (method === "GET" || searchAnswer)) {
+        const raw = searchAnswer
+          ? await readJson(req)
+          : Object.fromEntries(url.searchParams);
+        const query = raw.query ?? raw.q;
+        if (typeof query !== "string" || query.trim().length > 300)
+          throw new HttpError(
+            400,
+            "Запрос должен содержать не более 300 символов",
+          );
+        const options: SearchQuery = { query: query.trim() };
+        if (raw.kind !== undefined && raw.kind !== "") {
+          if (
+            !["book", "document", "presentation", "video", "audio"].includes(
+              raw.kind,
+            )
+          )
+            throw new HttpError(400, "Неизвестный тип материала");
+          options.kind = raw.kind;
+        }
+        for (const key of ["material", "collection"] as const)
+          if (raw[key] !== undefined) {
+            if (typeof raw[key] !== "string" || raw[key].length > 200)
+              throw new HttpError(400, "Некорректная область поиска");
+            options[key] = raw[key];
+          }
+        for (const key of ["offset", "limit"] as const)
+          if (raw[key] !== undefined) {
+            const n = Number(raw[key]);
+            if (
+              !Number.isSafeInteger(n) ||
+              n < 0 ||
+              (key === "limit" && (n < 1 || n > 50)) ||
+              n > 1000000
+            )
+              throw new HttpError(400, "Некорректная страница поиска");
+            options[key] = n;
+          }
+        const access = () => {
+          const current = !!getSession(store, req);
+          if (store.setting("closed") === "true" && !current)
+            throw new HttpError(401, "Библиотека доступна после входа");
+          return current;
+        };
+        const controller = new AbortController();
+        const cancel = () => {
+          if (!res.writableEnded) controller.abort();
+        };
+        res.on("close", cancel);
+        try {
+          if (!searchAnswer) {
+            const result = await search.search(
+              options,
+              access(),
+              controller.signal,
+            );
+            const nowEditor = access();
+            // Access may have changed while query embedding was running.
+            if (nowEditor !== editor)
+              return json(
+                res,
+                200,
+                await search.search(options, nowEditor, controller.signal),
+              );
+            return json(res, 200, result);
+          }
+          const key = String(
+            req.headers["x-dreambusta-client"] ||
+              req.socket.remoteAddress ||
+              "",
+          );
+          const old = answerAttempts.get(key);
+          const attempt =
+            old && old.since > Date.now() - 300000
+              ? old
+              : { since: Date.now(), count: 0 };
+          if (++attempt.count > 15 || activeAnswers >= 2)
+            throw new HttpError(
+              429,
+              "Слишком много запросов к модели. Повторите немного позже.",
+            );
+          if (answerAttempts.size > 1000) answerAttempts.clear();
+          answerAttempts.set(key, attempt);
+          activeAnswers++;
+          try {
+            const answer = await search.answer(
+              options,
+              access,
+              controller.signal,
+            );
+            access();
+            return json(res, 200, answer);
+          } finally {
+            activeAnswers--;
+          }
+        } finally {
+          res.off("close", cancel);
+        }
+      }
       if (parts[1] === "logout" && method === "POST") {
         logout(store, req, res);
         return json(res, 200, { ok: true });
@@ -429,5 +549,8 @@ export function createApp({ dataDir }: { dataDir: string }) {
       );
     }
   });
-  return { server, store };
+  server.on("close", () => {
+    void search.close();
+  });
+  return { server, store, search };
 }

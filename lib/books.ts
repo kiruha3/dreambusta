@@ -1,9 +1,9 @@
-import type { BookChapter } from '../shared/types.ts';
+import type { BookChapter, ParagraphLocation } from '../shared/types.ts';
 import { normalizeChapters } from './chapters.ts';
 export const MAX_FILE_SIZE = 25 * 1024 * 1024;
 export const MAX_TEXT_SIZE = 50 * 1024 * 1024;
 export const FORMATS = ['EPUB', 'FB2', 'FB2.ZIP', 'PDF', 'TXT', 'DOCX', 'MOBI', 'AZW3'] as const;
-export type BookDocument = { title: string; author: string; paragraphs: string[]; chapters?: BookChapter[] };
+export type BookDocument = { title: string; author: string; paragraphs: string[]; chapters?: BookChapter[]; paragraphLocations?: ParagraphLocation[] };
 export type BookSummary = { id: string; title: string; author: string; format: string; wordCount: number; createdAt: string; originalName: string };
 export function supportedFormat(name: string): string | null {
   const upper = name.toUpperCase();

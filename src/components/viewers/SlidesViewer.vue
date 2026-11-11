@@ -4,7 +4,11 @@ import type { PresentationScene } from "../../../vendor/shared/presentation";
 import SlideCanvas from "./SlideCanvas.vue";
 import Icon from "../Icon.vue";
 import { loadViewPosition, saveViewPosition } from "../../lib/view-position";
-const props = defineProps<{ src: string; positionKey: string }>();
+const props = defineProps<{
+  src: string;
+  positionKey: string;
+  startPage?: number;
+}>();
 const scene = ref<PresentationScene>();
 const index = ref(0);
 const zoom = ref(1);
@@ -31,7 +35,10 @@ watch(
       if (request.signal.aborted) return;
       if (!data.slides.length) throw new Error("В презентации нет слайдов");
       const saved = loadViewPosition(props.positionKey, data.slides.length);
-      index.value = saved.page - 1;
+      index.value =
+        props.startPage !== undefined
+          ? Math.max(0, Math.min(data.slides.length - 1, props.startPage - 1))
+          : saved.page - 1;
       zoom.value = saved.zoom;
       scene.value = data;
       ready = true;
@@ -47,6 +54,12 @@ watch(
     if (ready) saveViewPosition(props.positionKey, index.value + 1, zoom.value);
   },
   { flush: "sync" },
+);
+watch(
+  () => props.startPage,
+  (value) => {
+    if (value !== undefined && ready) go(value);
+  },
 );
 function go(page: number) {
   index.value = Math.min(

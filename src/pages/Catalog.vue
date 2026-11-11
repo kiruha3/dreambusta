@@ -5,6 +5,7 @@ import type { Material } from "../../shared/types";
 import { api, session, kindNames } from "../api";
 import Icon from "../components/Icon.vue";
 import MaterialCard from "../components/MaterialCard.vue";
+import { openSearch } from "../composables/search";
 const route = useRoute();
 const items = ref<Material[]>([]);
 const query = ref("");
@@ -70,12 +71,13 @@ watch(
     >
   </div>
   <div class="catalog-tools">
-    <label class="search-box"
-      ><Icon name="search" /><input
-        v-model="query"
-        aria-label="Поиск материалов"
-        placeholder="Название, автор или тема"
-      /><kbd>/</kbd></label
+    <button
+      class="search-box catalog-search-trigger"
+      aria-label="Поиск материалов"
+      @click="openSearch"
+    >
+      <Icon name="search" /><span>Поиск по текстам, названиям и темам</span
+      ><kbd>Ctrl K</kbd></button
     ><select v-model="order" aria-label="Сортировка">
       <option value="new">Сначала новые</option>
       <option value="title">По названию</option>

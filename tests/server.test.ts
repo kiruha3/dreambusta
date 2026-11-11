@@ -9,7 +9,7 @@ test("editor setup, CSRF, hidden materials and closed catalogue are enforced by 
   const mod = await import("../server/app.ts").catch(() => null);
   assert.ok(mod?.createApp, "HTTP application is not implemented");
   const dir = mkdtempSync(join(tmpdir(), "dreambusta-http-"));
-  const app = mod.createApp({ dataDir: dir });
+  const app = mod.createApp({ dataDir: dir, searchModels:false });
   await new Promise<void>((r) => app.server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${(app.server.address() as any).port}`;
   t.after(async () => {

@@ -40,6 +40,11 @@ export function slugify(value: string) {
 export class Store {
   db: DatabaseSync;
   private closed = false;
+  private listeners = new Set<() => void>();
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
   constructor(dir: string) {
     mkdirSync(dir, { recursive: true });
     this.db = new DatabaseSync(join(dir, "library.sqlite"));
@@ -54,6 +59,7 @@ export class Store {
   close() {
     if (!this.closed) {
       this.db.close();
+      this.listeners.clear();
       this.closed = true;
     }
   }
@@ -62,6 +68,7 @@ export class Store {
     try {
       const result = fn();
       this.db.exec("COMMIT");
+      for (const listener of this.listeners) listener();
       return result;
     } catch (err) {
       this.db.exec("ROLLBACK");

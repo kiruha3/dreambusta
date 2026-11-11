@@ -79,7 +79,9 @@ export function cleanHtml(value: string) {
 }
 export function plainParagraphs(html: string) {
   const { document } = parseHTML(`<html><body>${html}</body></html>`);
-  document.querySelectorAll(".publication-link-icon").forEach(el => el.remove());
+  document
+    .querySelectorAll(".publication-link-icon")
+    .forEach((el) => el.remove());
   for (const br of document.querySelectorAll("br")) br.replaceWith("\n");
   const blocks = document.querySelectorAll(
     "p,h1,h2,h3,h4,h5,h6,li,pre,tr,blockquote",
@@ -132,6 +134,7 @@ export async function processFile(file: File): Promise<Processed> {
     const document = await importPdf(file, result.title!);
     result.title = document.title;
     result.paragraphs = document.paragraphs;
+    result.paragraphLocations = document.paragraphLocations;
     result.author = document.author;
     result.representations = ["pdf"];
     if (!result.paragraphs.some((x) => x.trim()))
@@ -163,9 +166,14 @@ export async function processFile(file: File): Promise<Processed> {
               ? [o.text.content]
               : [],
       );
+    result.paragraphLocations = [];
     result.paragraphs = doc.scene.slides.flatMap((s, i) => {
       const text = collect(s.objects);
-      return text.length ? [`Слайд ${i + 1}`, ...text] : [];
+      const paragraphs = text.length ? [`Слайд ${i + 1}`, ...text] : [];
+      result.paragraphLocations!.push(
+        ...paragraphs.map(() => ({ slide: i + 1 })),
+      );
+      return paragraphs;
     });
     result.warnings = [
       "Статический просмотр: анимация, видео и сложные объекты PowerPoint могут не отображаться.",
@@ -197,8 +205,15 @@ export async function processFile(file: File): Promise<Processed> {
     if (ext === "docx") result.representations = ["docx"];
     else result.kind = "book";
   }
+  if (result.paragraphLocations)
+    result.paragraphLocations = result.paragraphLocations.filter(
+      (_l, i) => !!result.paragraphs![i].trim(),
+    );
   result.paragraphs = result.paragraphs!.map((s) => s.trim()).filter(Boolean);
-  if (new TextEncoder().encode(result.paragraphs.join("\n\n")).byteLength > MAX_TEXT_SIZE)
+  if (
+    new TextEncoder().encode(result.paragraphs.join("\n\n")).byteLength >
+    MAX_TEXT_SIZE
+  )
     throw new Error("Текст превышает 50 МБ");
   result.wordCount = result.paragraphs
     .join(" ")

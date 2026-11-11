@@ -1,5 +1,12 @@
 export type Kind = "book" | "document" | "presentation" | "video" | "audio";
-export interface BookChapter { title: string; paragraph: number }
+export interface BookChapter {
+  title: string;
+  paragraph: number;
+}
+export interface ParagraphLocation {
+  page?: number;
+  slide?: number;
+}
 export type Representation =
   "article" | "text" | "pdf" | "docx" | "slides" | "video" | "audio";
 export interface ShareImportOptions {
@@ -60,6 +67,7 @@ export interface Material {
   paragraphs: string[];
   html: string;
   pages?: PublicationPage[];
+  paragraphLocations?: ParagraphLocation[];
   chapters?: BookChapter[];
   navigation?: PublicationNode[];
   pageAddresses?: Record<string, string>;

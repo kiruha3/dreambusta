@@ -128,6 +128,7 @@ export async function upload(
       m.id,
       {
         ...processed,
+        paragraphLocations: processed.paragraphLocations || [],
         pages: [],
         navigation: [],
         icon: null,

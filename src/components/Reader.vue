@@ -27,6 +27,9 @@ const props = defineProps<{
   textVersion: number;
   speedMode: boolean;
   chapters?: BookChapter[];
+  startParagraph?: number;
+  startOffset?: number;
+  searchQuery?: string;
 }>();
 const tokens = computed(() => tokenize(props.paragraphs));
 const index = ref(0);
@@ -191,6 +194,37 @@ watch(
     } catch {
       index.value = 0;
       speed.value = 300;
+    }
+  },
+  { immediate: true },
+);
+watch(
+  () => [
+    props.startParagraph,
+    props.startOffset,
+    props.searchQuery,
+    props.textVersion,
+  ],
+  () => {
+    if (
+      props.startParagraph === undefined ||
+      props.startParagraph >= props.paragraphs.length
+    )
+      return;
+    const paragraph = props.paragraphs[props.startParagraph];
+    const offset = props.startOffset || 0;
+    const words = [...paragraph.matchAll(/\S+/gu)];
+    const wordOffset = Math.max(
+      0,
+      words.findIndex((word) => word.index + word[0].length > offset),
+    );
+    const first = tokens.value.findIndex(
+      (t) => t.paragraph === props.startParagraph,
+    );
+    if (first >= 0) {
+      seek(Math.min(first + wordOffset, tokens.value.length - 1));
+      search.value = props.searchQuery || "";
+      void nextTick(() => textBox.value?.follow());
     }
   },
   { immediate: true },

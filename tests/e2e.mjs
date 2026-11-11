@@ -26,6 +26,7 @@ const { chromium } = (() => {
 const dir = mkdtempSync(join(tmpdir(), "dreambusta-e2e-"));
 const env = {
   ...process.env,
+  DREAMBUSTA_AI: 'off',
   DATA_DIR: dir,
   API_PORT: "5186",
   WEB_PORT: "5185",

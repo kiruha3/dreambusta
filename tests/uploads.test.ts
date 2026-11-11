@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createApp } from "../server/app.ts";
 test("uploads persist originals, support media Range, and reject anonymous writes and hidden file reads", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "dreambusta-upload-"));
-  const app = createApp({ dataDir: dir });
+  const app = createApp({ dataDir: dir, searchModels:false });
   await new Promise<void>((r) => app.server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${(app.server.address() as any).port}`;
   t.after(async () => {

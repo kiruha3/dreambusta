@@ -20,7 +20,11 @@ import PdfThumbnail from "./PdfThumbnail.vue";
 import { loadViewPosition, saveViewPosition } from "../../lib/view-position";
 
 pdfjs.GlobalWorkerOptions.workerSrc = worker;
-const props = defineProps<{ src: string; positionKey: string }>();
+const props = defineProps<{
+  src: string;
+  positionKey: string;
+  startPage?: number;
+}>();
 const container = ref<HTMLDivElement>();
 const pagesElement = ref<HTMLDivElement>();
 const pdf = shallowRef<pdfjs.PDFDocumentProxy>();
@@ -41,6 +45,12 @@ let baseScale = 1;
 let lastWidth = 0;
 let bus: EventBus;
 
+watch(
+  () => props.startPage,
+  (value) => {
+    if (value !== undefined) go(value);
+  },
+);
 function save() {
   if (ready) saveViewPosition(props.positionKey, pageNumber.value, zoom.value);
 }
@@ -115,7 +125,10 @@ onMounted(() => {
   bus.on("pagesinit", () => {
     if (!pdf.value) return;
     const saved = loadViewPosition(props.positionKey, pages.value);
-    pageNumber.value = saved.page;
+    pageNumber.value =
+      props.startPage !== undefined
+        ? Math.max(1, Math.min(pages.value, props.startPage))
+        : saved.page;
     zoom.value = saved.zoom;
     fit();
     ready = true;

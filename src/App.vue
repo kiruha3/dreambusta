@@ -3,6 +3,8 @@ import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { session, send, loadSession, ui } from "./api";
 import Icon from "./components/Icon.vue";
+import SearchDialog from "./components/SearchDialog.vue";
+import { openSearch } from "./composables/search";
 const route = useRoute();
 const admin = computed(() => route.path.startsWith("/admin"));
 const menu = ref(false);
@@ -114,6 +116,13 @@ async function logout() {
         </div>
         <div class="row gap8">
           <button
+            class="button small global-search-trigger"
+            aria-label="Поиск по библиотеке"
+            @click="openSearch"
+          >
+            <Icon name="search" :size="16" /><span>Поиск</span><kbd>Ctrl K</kbd>
+          </button>
+          <button
             class="icon-button"
             :aria-label="dark ? 'Светлая тема' : 'Тёмная тема'"
             @click="dark = !dark"
@@ -140,5 +149,6 @@ async function logout() {
     <div v-if="ui.notice" class="toast" role="status">
       <Icon name="check" />{{ ui.notice }}
     </div>
+    <SearchDialog />
   </div>
 </template>

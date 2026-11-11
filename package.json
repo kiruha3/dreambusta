@@ -13,7 +13,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "vue-tsc --noEmit",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs && node tests/search-e2e.mjs",
+    "test:search:live": "node tests/search-live.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

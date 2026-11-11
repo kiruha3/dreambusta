@@ -16,6 +16,7 @@ import Icon from "../components/Icon.vue";
 import Reader from "../components/Reader.vue";
 import PublicationTree from "../components/PublicationTree.vue";
 import PublicationIcon from "../components/PublicationIcon.vue";
+import { searchNumber } from "../lib/search-location";
 const PdfViewer = defineAsyncComponent(
   () => import("../components/viewers/PdfViewer.vue"),
 );
@@ -50,8 +51,11 @@ function favorites(): string[] {
     m.value = loaded;
     favorite.value = favorites().includes(loaded.id);
     if (route.params.slug !== loaded.slug) {
-      await router.replace(`/library/${loaded.slug}`);
-      return;
+      await router.replace({
+        path: `/library/${loaded.slug}`,
+        query: route.query,
+        hash: route.hash,
+      });
     }
     let saved = "";
     try {
@@ -67,6 +71,7 @@ function favorites(): string[] {
         : modes.includes("text")
           ? "text"
           : modes[0] || "";
+    applySearchMode();
   } catch (e) {
     error.value = (e as Error).message;
   }
@@ -84,6 +89,54 @@ const currentPage = computed(() =>
 );
 const pageMissing = computed(() => !!route.query.page && !currentPage.value);
 const content = computed(() => currentPage.value || m.value);
+const staleSearch = computed(
+  () =>
+    searchNumber(route.query.version) !== undefined &&
+    searchNumber(route.query.version) !== m.value?.textVersion,
+);
+const searchParagraph = computed(() =>
+  staleSearch.value ? undefined : searchNumber(route.query.paragraph),
+);
+let searchLoad = 0;
+watch(
+  () => route.query.version,
+  async (value) => {
+    const version = searchNumber(value);
+    if (version === undefined || !m.value || version === m.value.textVersion)
+      return;
+    const request = ++searchLoad;
+    try {
+      const fresh = await api<Material>(`/materials/${m.value.id}`);
+      if (request !== searchLoad) return;
+      m.value = fresh;
+      applySearchMode();
+    } catch (e) {
+      if (request === searchLoad) {
+        m.value = undefined;
+        error.value = (e as Error).message;
+      }
+    }
+  },
+);
+function applySearchMode() {
+  const view = String(route.query.view || "");
+  if (
+    !staleSearch.value &&
+    ["text", "pdf", "slides"].includes(view) &&
+    m.value?.representations.includes(view as any)
+  )
+    mode.value = view;
+}
+watch(
+  () => [
+    route.query.view,
+    route.query.paragraph,
+    route.query.pdfPage,
+    route.query.slide,
+    route.query.version,
+  ],
+  applySearchMode,
+);
 const article = ref<HTMLElement>();
 const pagePath = (slug?: string) =>
   `/library/${m.value!.slug}${slug ? `?page=${encodeURIComponent(slug)}` : ""}`;
@@ -264,6 +317,9 @@ async function copy() {
     <h1>{{ error }}</h1>
     <p>Проверьте адрес или обратитесь к редактору библиотеки.</p>
   </div>
+  <div v-if="m && staleSearch" class="notice" role="status">
+    Материал обновлён. Место из старого результата поиска может отличаться.
+  </div>
   <template v-if="m"
     ><div class="material-header">
       <div>
@@ -417,6 +473,11 @@ async function copy() {
           :material-id="currentPage ? `${m.id}:${currentPage.slug}` : m.id"
           :text-version="m.textVersion"
           :speed-mode="mode === 'speed'"
+          :start-paragraph="searchParagraph"
+          :start-offset="
+            staleSearch ? undefined : searchNumber(route.query.offset)
+          "
+          :search-query="staleSearch ? '' : String(route.query.q || '')"
         />
         <article
           v-else-if="mode === 'article'"
@@ -435,6 +496,9 @@ async function copy() {
           v-else-if="mode === 'pdf'"
           :src="fileUrl(m.id, 'pdf')"
           :position-key="`dreambusta-view:${m.id}:${m.textVersion}:pdf`"
+          :start-page="
+            staleSearch ? undefined : searchNumber(route.query.pdfPage)
+          "
         />
         <DocxViewer
           v-else-if="mode === 'docx'"
@@ -445,6 +509,9 @@ async function copy() {
           v-else-if="mode === 'slides'"
           :src="fileUrl(m.id, 'slides')"
           :position-key="`dreambusta-view:${m.id}:${m.textVersion}:slides`"
+          :start-page="
+            staleSearch ? undefined : searchNumber(route.query.slide)
+          "
         />
         <MediaViewer
           v-else-if="mode === 'video' || mode === 'audio'"
