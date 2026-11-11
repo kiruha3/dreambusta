@@ -43,7 +43,8 @@ export const router = createRouter({
       component: () => import("./pages/NotFound.vue"),
     },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  // Material.vue scrolls fragment targets after its saved HTML is rendered.
+  scrollBehavior: (to) => (to.hash ? false : { top: 0 }),
 });
 router.beforeEach(async (to) => {
   try {

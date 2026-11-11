@@ -1,169 +1,274 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, nextTick } from "vue";
+import {
+  ref,
+  shallowRef,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import * as pdfjs from "pdfjs-dist";
+import {
+  EventBus,
+  PDFViewer,
+  PDFLinkService,
+} from "pdfjs-dist/web/pdf_viewer.mjs";
+import "pdfjs-dist/web/pdf_viewer.css";
 import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import Icon from "../Icon.vue";
+import PdfThumbnail from "./PdfThumbnail.vue";
 import { loadViewPosition, saveViewPosition } from "../../lib/view-position";
+
 pdfjs.GlobalWorkerOptions.workerSrc = worker;
 const props = defineProps<{ src: string; positionKey: string }>();
-const canvas = ref<HTMLCanvasElement>();
-const stage = ref<HTMLElement>();
+const container = ref<HTMLDivElement>();
+const pagesElement = ref<HTMLDivElement>();
+const pdf = shallowRef<pdfjs.PDFDocumentProxy>();
 const pageNumber = ref(1);
 const pages = ref(0);
 const zoom = ref(1);
 const error = ref("");
 const busy = ref(false);
-let pdf: pdfjs.PDFDocumentProxy | undefined;
+const pageListOpen = ref(false);
+const pageNavigationMode = ref<"list" | "thumbnails">("list");
+let viewer: PDFViewer | undefined;
+let links: PDFLinkService | undefined;
 let task: pdfjs.PDFDocumentLoadingTask | undefined;
-let render: pdfjs.RenderTask | undefined;
+let resize: ResizeObserver | undefined;
 let generation = 0;
-let drawing = 0;
 let ready = false;
-async function paint() {
-  const gen = ++drawing;
-  const previous = render;
-  render = undefined;
-  previous?.cancel();
-  await previous?.promise.catch(() => {});
-  if (gen !== drawing) return;
-  if (!pdf || !canvas.value) return;
-  const doc = pdf;
+let baseScale = 1;
+let lastWidth = 0;
+let bus: EventBus;
+
+function save() {
+  if (ready) saveViewPosition(props.positionKey, pageNumber.value, zoom.value);
+}
+function fit() {
+  if (!viewer || !pdf.value || !container.value?.clientWidth) return;
+  const page = pageNumber.value;
+  viewer.currentScaleValue = "page-width";
+  baseScale = viewer.currentScale;
+  viewer.currentScale = baseScale * zoom.value;
+  viewer.scrollPageIntoView({ pageNumber: page });
+}
+function go(value: number) {
+  if (!viewer || !ready) return;
+  viewer.scrollPageIntoView({
+    pageNumber: Math.max(1, Math.min(pages.value, Math.floor(value) || 1)),
+  });
+}
+async function load() {
+  const gen = ++generation;
+  ready = false;
+  error.value = "";
   busy.value = true;
+  pdf.value = undefined;
+  pages.value = 0;
+  viewer?.setDocument(null as unknown as pdfjs.PDFDocumentProxy);
+  links?.setDocument(null);
+  await task?.destroy();
+  if (gen !== generation) return;
+  const assets = new URL(`/pdfjs/${pdfjs.version}/`, window.location.href).href;
+  task = pdfjs.getDocument({
+    url: props.src,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    wasmUrl: assets + "wasm/",
+    cMapUrl: assets + "cmaps/",
+    cMapPacked: true,
+    standardFontDataUrl: assets + "standard_fonts/",
+  });
   try {
-    const page = await doc.getPage(pageNumber.value);
-    if (gen !== drawing || doc !== pdf || !canvas.value) return;
-    const natural = page.getViewport({ scale: 1 });
-    const fit = Math.min(
-      1.5,
-      Math.max(0.25, ((stage.value?.clientWidth || 700) - 40) / natural.width),
-    );
-    const scale = fit * zoom.value;
-    const viewport = page.getViewport({ scale });
-    const ratio = Math.min(2, window.devicePixelRatio || 1);
-    const c = canvas.value;
-    c.width = Math.floor(viewport.width * ratio);
-    c.height = Math.floor(viewport.height * ratio);
-    c.style.width = viewport.width + "px";
-    c.style.height = viewport.height + "px";
-    render = page.render({
-      canvas: c,
-      canvasContext: c.getContext("2d")!,
-      viewport,
-      transform: [ratio, 0, 0, ratio, 0, 0],
-    });
-    await render.promise;
-  } catch (e) {
-    if ((e as Error).name !== "RenderingCancelledException" && gen === drawing)
-      error.value = (e as Error).message;
-  } finally {
-    if (gen === drawing) busy.value = false;
+    const document = await task.promise;
+    if (gen !== generation) {
+      await document.destroy();
+      return;
+    }
+    pdf.value = document;
+    pages.value = document.numPages;
+    links!.setDocument(document);
+    viewer!.setDocument(document);
+  } catch (cause) {
+    if (gen === generation) {
+      error.value = (cause as Error).message;
+      busy.value = false;
+    }
   }
 }
-watch(
-  () => [props.src, props.positionKey] as const,
-  async ([src]) => {
-    const gen = ++generation;
-    ready = false;
-    ++drawing;
-    render?.cancel();
-    await task?.destroy();
-    pdf = undefined;
-    pages.value = 0;
-    error.value = "";
-    busy.value = true;
-    if (gen !== generation) return;
-    task = pdfjs.getDocument({
-      url: src,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-    try {
-      const doc = await task.promise;
-      if (gen !== generation) {
-        await doc.destroy();
-        return;
-      }
-      pdf = doc;
-      pages.value = doc.numPages;
-      const saved = loadViewPosition(props.positionKey, doc.numPages);
-      pageNumber.value = saved.page;
-      zoom.value = saved.zoom;
-      await nextTick();
-      if (gen !== generation) return;
-      ready = true;
-      await paint();
-    } catch (e) {
-      if (gen === generation) {
-        error.value = (e as Error).message;
-        busy.value = false;
-      }
-    }
-  },
-  { immediate: true },
-);
-watch(
-  [pageNumber, zoom],
-  () => {
+onMounted(() => {
+  bus = new EventBus();
+  links = new PDFLinkService({
+    eventBus: bus,
+    externalLinkTarget: 2,
+    externalLinkRel: "noopener noreferrer",
+  });
+  viewer = new PDFViewer({
+    container: container.value!,
+    viewer: pagesElement.value!,
+    eventBus: bus,
+    linkService: links,
+    annotationMode: pdfjs.AnnotationMode.ENABLE,
+    maxCanvasPixels: 12 * 1024 * 1024,
+  });
+  links.setViewer(viewer);
+  bus.on("pagesinit", () => {
+    if (!pdf.value) return;
+    const saved = loadViewPosition(props.positionKey, pages.value);
+    pageNumber.value = saved.page;
+    zoom.value = saved.zoom;
+    fit();
+    ready = true;
+    busy.value = false;
+  });
+  bus.on("pagechanging", ({ pageNumber: page }: { pageNumber: number }) => {
     if (!ready) return;
-    saveViewPosition(props.positionKey, pageNumber.value, zoom.value);
-    void paint();
+    pageNumber.value = page;
+    save();
+  });
+  bus.on("pagerendered", ({ error: cause }: { error?: Error }) => {
+    if (cause) error.value = cause.message;
+  });
+  resize = new ResizeObserver(() => {
+    const width = container.value?.clientWidth || 0;
+    if (width && Math.abs(width - lastWidth) > 1) {
+      lastWidth = width;
+      if (ready) fit();
+    }
+  });
+  resize.observe(container.value!);
+  void load();
+});
+watch(
+  () => [props.src, props.positionKey],
+  () => {
+    if (viewer) void load();
   },
-  { flush: "sync" },
 );
-function go(n: number) {
-  pageNumber.value = Math.min(pages.value, Math.max(1, Math.floor(n) || 1));
-}
+watch(zoom, () => {
+  if (ready && viewer) {
+    viewer.currentScale = baseScale * zoom.value;
+    save();
+  }
+});
+watch(pageListOpen, async () => {
+  await nextTick();
+  if (ready) fit();
+});
 onBeforeUnmount(() => {
-  ready = false;
   generation++;
-  drawing++;
-  render?.cancel();
+  ready = false;
+  resize?.disconnect();
+  viewer?.setDocument(null as unknown as pdfjs.PDFDocumentProxy);
   void task?.destroy();
 });
 </script>
 <template>
   <div class="pdf-controls">
     <button
+      class="button small"
+      aria-label="Страницы PDF"
+      :aria-expanded="pageListOpen"
+      @click="pageListOpen = !pageListOpen"
+    >
+      <Icon name="collections" :size="15" />Страницы
+    </button>
+    <button
       class="icon-button"
       aria-label="Предыдущая страница"
       :disabled="pageNumber <= 1"
       @click="go(pageNumber - 1)"
     >
-      <Icon name="left" /></button
-    ><input
+      <Icon name="left" />
+    </button>
+    <input
       :value="pageNumber"
       type="number"
       min="1"
       :max="pages"
       aria-label="Номер страницы"
       @change="go(Number(($event.target as HTMLInputElement).value))"
-    /><span>из {{ pages }}</span
-    ><button
+      @keydown.enter="go(Number(($event.target as HTMLInputElement).value))"
+    />
+    <span>из {{ pages }}</span>
+    <button
       class="icon-button"
       aria-label="Следующая страница"
       :disabled="pageNumber >= pages"
       @click="go(pageNumber + 1)"
     >
-      <Icon name="right" /></button
-    ><button
+      <Icon name="right" />
+    </button>
+    <button
       class="button small"
       aria-label="Уменьшить PDF"
+      :disabled="zoom <= 0.5"
       @click="zoom = Math.max(0.5, zoom - 0.25)"
     >
-      −</button
-    ><span>{{ Math.round(zoom * 100) }}%</span
-    ><button
+      −
+    </button>
+    <span>{{ Math.round(zoom * 100) }}%</span>
+    <button
       class="button small"
       aria-label="Увеличить PDF"
+      :disabled="zoom >= 3"
       @click="zoom = Math.min(3, zoom + 0.25)"
     >
-      +</button
-    ><span v-if="busy" class="muted">Загрузка…</span>
+      +
+    </button>
+    <span v-if="busy" class="muted" role="status">Загрузка…</span>
   </div>
   <div v-if="error" class="notice danger" role="alert">
     Не удалось отобразить PDF: {{ error }}
   </div>
-  <div ref="stage" class="pdf-canvas-stage">
-    <canvas ref="canvas" aria-label="Страница PDF"></canvas>
+  <div class="pdf-workspace" :class="{ 'pdf-with-pages': pageListOpen }">
+    <aside
+      v-if="pageListOpen"
+      class="pdf-page-list"
+      :class="{ 'pdf-thumbnails': pageNavigationMode === 'thumbnails' }"
+      aria-label="Страницы PDF"
+    >
+      <div class="pdf-sidebar-modes" aria-label="Вид навигации PDF">
+        <button
+          :aria-pressed="pageNavigationMode === 'list'"
+          @click="pageNavigationMode = 'list'"
+        >
+          Список
+        </button>
+        <button
+          :aria-pressed="pageNavigationMode === 'thumbnails'"
+          @click="pageNavigationMode = 'thumbnails'"
+        >
+          Миниатюры
+        </button>
+      </div>
+      <template v-if="pdf"
+        ><button
+          v-for="page in pages"
+          :key="page"
+          :aria-label="`Перейти к странице ${page}`"
+          :aria-current="pageNumber === page ? 'page' : undefined"
+          @click="go(page)"
+        >
+          <PdfThumbnail
+            v-if="pageNavigationMode === 'thumbnails' && pdf"
+            :document="pdf"
+            :page="page"
+          /><span>{{
+            pageNavigationMode === "thumbnails" ? page : `Страница ${page}`
+          }}</span>
+        </button></template
+      >
+    </aside>
+    <div class="pdf-page-area">
+      <div
+        ref="container"
+        class="pdf-canvas-stage"
+        tabindex="0"
+        aria-label="Страницы документа"
+      >
+        <div ref="pagesElement" class="pdfViewer"></div>
+      </div>
+    </div>
   </div>
 </template>

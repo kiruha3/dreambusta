@@ -4,11 +4,150 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../server/store.ts";
+import { parseHTML } from "linkedom";
 async function service() {
   const m = await import("../server/shares.ts").catch(() => null);
   assert.ok(m?.Shares, "Share service is missing");
   return m;
 }
+
+test("TechHelper snapshots published descendants and preserves internal links and anchors", async (t) => {
+  const { Shares } = await service();
+  const dir = mkdtempSync(join(tmpdir(), "dreambusta-kb-tree-"));
+  const store = new Store(dir);
+  t.after(() => {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const source = "https://docs.example.test/shared/kb/tree";
+  let broken = false;
+  const calls: string[] = [];
+  const get = async (url: string) => {
+    calls.push(url);
+    const page = new URL(url).searchParams.get("page_id");
+    const data =
+      page === "12"
+        ? {
+            id: 12,
+            title: "Глубже",
+            content: "[К началу](kb://10)\n\nГлубокий текст.",
+            children: [{ id: 10, title: "Начало" }],
+          }
+        : page === "11"
+          ? {
+              id: 11,
+              title: "База знаний",
+              content:
+                "[Глубже](kb://12)\n\n[Другой раздел](kb://13)\n\n[Якорь](#условия)\n\n## Условия\n\nСодержимое раздела.",
+              children: [{ id: 12, title: "Глубже" }],
+            }
+          : page === "13"
+            ? {
+                id: 13,
+                title: "Документы",
+                content: "Текст документов.",
+                children: [],
+              }
+            : {
+                id: 10,
+                title: "Начало",
+                content:
+                  "[База знаний](kb://11)\n\n[Документы](kb://13)\n\n[Сайт](https://example.org/)",
+                children: [
+                  { id: 11, title: "База знаний" },
+                  { id: 13, title: "Документы" },
+                ],
+              };
+    return {
+      status: broken && page === "12" ? 503 : 200,
+      contentType: "application/json",
+      body: Buffer.from(JSON.stringify(data)),
+    };
+  };
+  const shares = new Shares(store, dir, get);
+  const material = await shares.add(source);
+  const { document } = parseHTML(`<html><body>${material.html}</body></html>`);
+  assert.equal(
+    document.querySelector("a")?.getAttribute("href"),
+    source + "?page_id=11",
+  );
+  assert.equal(
+    material.pages?.length,
+    3,
+    "nested pages are saved once; parent cycles stop",
+  );
+  const child = material.pages!.find((p) => p.title === "База знаний")!;
+  assert.equal(child.slug, "baza-znaniy");
+  assert.match(decodeURI(child.html), /href="#условия"/);
+  assert.match(child.html, /id="условия"/);
+  assert.match(child.html, /page_id=13/);
+  const count = calls.length;
+  store.resolveMaterial(material.slug);
+  assert.equal(
+    calls.length,
+    count,
+    "opening a snapshot never fetches its source",
+  );
+  broken = true;
+  const kept = await shares.refresh(material.id);
+  assert.equal(kept.source.status, "error");
+  assert.deepEqual(
+    kept.pages,
+    material.pages,
+    "partial refresh cannot discard saved descendants",
+  );
+  store.updateMaterial(material.id, {
+    source: { ...kept.source, status: "unavailable" },
+  });
+  assert.deepEqual(shares.finishUnavailable(material.id).pages, []);
+});
+
+test("publication section URLs survive title changes and are never reassigned to another page", async (t) => {
+  const { Shares } = await service();
+  const dir = mkdtempSync(join(tmpdir(), "dreambusta-page-addresses-"));
+  const store = new Store(dir);
+  t.after(() => {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  let id = 11;
+  let title = "База знаний";
+  const shares = new Shares(store, dir, async (url: string) => ({
+    status: 200,
+    contentType: "application/json",
+    body: Buffer.from(
+      JSON.stringify(
+        new URL(url).searchParams.has("page_id")
+          ? { id, title, content: "Текст раздела" }
+          : {
+              id: 10,
+              title: "Статья",
+              content: "Начало",
+              children: [{ id, title }],
+            },
+      ),
+    ),
+  }));
+  const original = await shares.add(
+    "https://docs.example.test/shared/kb/addresses",
+  );
+  title = "Новая база знаний";
+  assert.equal(
+    (await shares.refresh(original.id)).pages![0].slug,
+    "baza-znaniy",
+  );
+  id = 12;
+  title = "База знаний";
+  assert.equal(
+    (await shares.refresh(original.id)).pages![0].slug,
+    "baza-znaniy-2",
+  );
+  id = 11;
+  assert.equal(
+    (await shares.refresh(original.id)).pages![0].slug,
+    "baza-znaniy",
+  );
+});
 test("known video providers have safe embeds and direct media links retain their type", async () => {
   const { resolveLink } = await service();
   assert.equal(resolveLink("https://youtu.be/abcdefghijk").provider, "youtube");

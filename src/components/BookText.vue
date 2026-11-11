@@ -13,6 +13,7 @@ const props = defineProps<{
   index: number;
   fontSize: number;
   search: string;
+  followCurrent?: boolean;
 }>();
 const emit = defineEmits<{ select: [index: number] }>();
 const container = ref<HTMLElement>();
@@ -22,6 +23,7 @@ const top = ref(0);
 const measured = ref<Record<number, number>>({});
 let resize: ResizeObserver;
 let rowsResize: ResizeObserver;
+let followGeneration = 0;
 const rows = computed(() => {
   const list: { words: Token[]; paragraph: number; start: number }[] = [];
   for (const token of props.tokens) {
@@ -86,20 +88,57 @@ watch(
     void nextTick(measure);
   },
 );
-function follow() {
+async function follow() {
+  const generation = ++followGeneration;
+  const target = props.index;
   const row = rows.value.findIndex(
     (r, i) =>
       props.index >= r.start &&
       (!rows.value[i + 1] || props.index < rows.value[i + 1].start),
   );
-  if (row >= 0 && container.value) {
-    container.value.scrollTop = Math.max(
-      0,
-      offsets.value[row] - container.value.clientHeight / 3,
+  if (row < 0) return;
+  let stable = 0;
+  // Materialize the virtual row, then position the actual word. Font/width
+  // changes can revise measured offsets on the following layout frame.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (
+      generation !== followGeneration ||
+      target !== props.index ||
+      !container.value
+    )
+      return;
+    const viewport = container.value;
+    const selected = viewport.querySelector<HTMLElement>(
+      `[data-token-index="${target}"]`,
     );
-    top.value = container.value.scrollTop;
+    if (!selected) {
+      viewport.scrollTop = Math.max(
+        0,
+        offsets.value[row] - viewport.clientHeight / 3,
+      );
+      stable = 0;
+    } else {
+      const outer = viewport.getBoundingClientRect();
+      const word = selected.getBoundingClientRect();
+      if (word.top < outer.top + 16 || word.bottom > outer.bottom - 16) {
+        viewport.scrollTop += word.top - outer.top - viewport.clientHeight / 3;
+        stable = 0;
+      } else if (++stable >= 2) return;
+    }
+    top.value = viewport.scrollTop;
+    await nextTick();
+    measure();
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
   }
 }
+watch(
+  () => props.index,
+  () => {
+    if (props.followCurrent) void nextTick(follow);
+  },
+);
 function nextMatch() {
   if (!props.search.trim()) return;
   const terms = props.search.toLocaleLowerCase().trim().split(/\s+/);
@@ -152,6 +191,7 @@ onMounted(() => {
   void nextTick(follow);
 });
 onBeforeUnmount(() => {
+  followGeneration++;
   resize?.disconnect();
   rowsResize?.disconnect();
 });
@@ -194,6 +234,7 @@ onBeforeUnmount(() => {
           <template v-for="(token, i) in row.words" :key="token.index"
             ><span
               class="reading-word"
+              :data-token-index="token.index"
               :class="{
                 'selected-word': token.index === index,
                 'found-word':

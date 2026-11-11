@@ -128,6 +128,9 @@ export async function upload(
       m.id,
       {
         ...processed,
+        pages: [],
+        navigation: [],
+        icon: null,
         title: existing?.title || processed.title!,
         source: { type: "file" },
         files,
@@ -185,6 +188,11 @@ export function serveFile(
     throw new HttpError(404, "Файл отсутствует на диске");
   }
   res.setHeader("Content-Type", ref.mime);
+  if (ref.mime === "image/svg+xml")
+    res.setHeader(
+      "Content-Security-Policy",
+      "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+    );
   res.setHeader("Accept-Ranges", "bytes");
   res.setHeader(
     "Content-Disposition",

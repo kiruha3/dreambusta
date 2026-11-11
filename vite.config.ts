@@ -4,6 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { resolve, relative, isAbsolute, sep } from "node:path";
+import { pdfjsAssets } from "./scripts/pdfjs-assets";
 const privateStorage = resolve(process.env.DATA_DIR || "data").replaceAll(
   "\\",
   "/",
@@ -29,6 +30,7 @@ const apiProxy: ProxyOptions = {
 };
 export default defineConfig({
   plugins: [
+    pdfjsAssets(),
     vue(),
     tailwindcss(),
     {
@@ -57,7 +59,7 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: Number(process.env.WEB_PORT || 5175),
+    port: Number(process.env.WEB_PORT || 5173),
     strictPort: true,
     fs: {
       // API authorization is the only route to private storage, including /@fs/.
@@ -76,7 +78,7 @@ export default defineConfig({
   },
   preview: {
     host: "0.0.0.0",
-    port: 5175,
+    port: Number(process.env.WEB_PORT || 5173),
     proxy: {
       "/api": apiProxy,
     },

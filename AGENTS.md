@@ -12,7 +12,7 @@
 
 - This folder is an independent nested Git repository on feat/vue-library, no remote. Do not turn it into a parent-repository gitlink/submodule.
 - Active app: Vue 3 in src/, Node 24 API in server/, SQLite/files in ignored data/. Historical React/Cloudflare sources are inactive and preserved by baseline b5fb240.
-- Local launch: npm run dev, frontend 5175 and API 5176. No deployment is authorized for DreamBusta. Do not reuse any Academy credentials.
+- Local launch: npm run dev, frontend 5173 with --host 0.0.0.0 and API 5176. On 2026-11-11 the user explicitly authorized deploying DreamBusta to 45.9.12.136, preserving everything already there. Keep it separate from WBook: /opt/dreambusta, /var/lib/dreambusta, dreambusta.service and its own Nginx vhost. Do not reuse any Academy credentials.
 - Preserve the original WBook checkout and its private library. Do not commit data/, .env, generated design exports, browser artifacts or node_modules.
 - Run npm test, npm run typecheck, npm run build and npm run test:e2e for relevant app changes. E2E uses its own temporary database; never seed test credentials into working data/.
 - Share snapshots are opened without fetching the source. A failed manual refresh retains the last good snapshot; only explicit finish-unavailable revokes it.

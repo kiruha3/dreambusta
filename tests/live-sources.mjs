@@ -15,8 +15,30 @@ try {
   assert.match(material.html, /Quick Start Guide/);
   assert.doesNotMatch(material.html, /Trash|Cookie|Workspace Settings/);
   assert.ok(material.wordCount > 10);
+  assert.equal(material.source.importOptions.scope, "branch");
+  assert.equal(material.icon?.type, "image");
+  assert.match(material.icon.value, /^snapshot:icon-/);
+  assert.ok(
+    material.pages.some(
+      (p) => p.icon?.type === "emoji" && p.icon.value === "🗂️",
+    ),
+  );
+  assert.ok(
+    material.pages.length >= 9,
+    "published guide descendants are saved",
+  );
+  assert.equal(material.navigation.length, material.pages.length + 1);
+  assert.ok(
+    !material.pages.some(
+      (p) => p.title === "Help center" || p.title === "Privacy Policy",
+    ),
+  );
+  assert.ok(material.pages.every((p) => p.parentSourceUrl));
+  const menu = await new Shares(store, dir).navigation(material.source.url);
+  assert.ok(menu.some((n) => n.title === "Help center"));
+  assert.ok(menu.some((n) => n.sourceUrl === material.source.url));
   console.log(
-    "PASS: public Buildin snapshot, main article only, no account/session.",
+    `PASS: public Buildin branch (${material.pages.length + 1} pages), menu (${menu.length} pages), no account/session.`,
   );
 } finally {
   store.close();

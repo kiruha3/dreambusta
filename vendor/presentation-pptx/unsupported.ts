@@ -20,8 +20,8 @@ export function unsupportedLabel(shape: Element): string {
 }
 
 /** Locks unsupported paints/effects instead of rendering an apparently editable empty shape. */
-export function unsupportedVisual(shape: Element): boolean {
-  const paints = ['custGeom', 'gradFill', 'pattFill', 'blipFill'].some(name => descendants(shape, name).length > 0)
+export function unsupportedVisual(shape: Element, includeEffects = true, supported: string[] = []): boolean {
+  const paints = ['custGeom', 'gradFill', 'pattFill', 'blipFill'].filter(name => !supported.includes(name)).some(name => descendants(shape, name).length > 0)
   const effects = descendants(shape, 'effectLst').some(element => children(element).length > 0)
-  return paints || effects
+  return paints || (includeEffects && effects)
 }

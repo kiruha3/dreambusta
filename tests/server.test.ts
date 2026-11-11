@@ -32,6 +32,7 @@ test("editor setup, CSRF, hidden materials and closed catalogue are enforced by 
     (await request("/api/materials", "POST", { title: "No" })).status,
     401,
   );
+  assert.equal((await request("/api/links/navigation", "POST", {url:"https://buildin.ai/share/public"})).status,401);
   assert.equal((await request('/api/setup', 'POST', { email: 'remote@example.test', password: 'remote-password-long' }, { 'x-dreambusta-client': '192.168.1.10' })).status, 403, 'dev proxy preserves the real setup client address');
   const firstBody = JSON.stringify({ email: 'other@example.test', password: 'another-password-long' });
   let finishFirst: ReturnType<typeof httpRequest>;
@@ -62,6 +63,10 @@ test("editor setup, CSRF, hidden materials and closed catalogue are enforced by 
     403,
   );
   const headers = { cookie, "x-csrf-token": session.csrf };
+  assert.equal((await request("/api/links/navigation", "POST", {url:"https://buildin.ai/share/public"},{cookie})).status,403);
+  assert.equal((await request("/api/links", "POST", {url:"https://buildin.ai/share/public",importOptions:{scope:"invalid"}},headers)).status,400);
+  const normalized=await request("/api/links/preview","POST",{url:"http://www.buildin.ai/share/public/?utm_source=copy"},headers);
+  assert.equal((await normalized.json()).url,"https://buildin.ai/share/public");
   const created = await request(
     "/api/materials",
     "POST",

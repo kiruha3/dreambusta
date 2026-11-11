@@ -1,0 +1,31 @@
+[Unit]
+Description=DreamBusta content library
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dreambusta
+Group=dreambusta
+WorkingDirectory=/opt/dreambusta/current
+Environment=NODE_ENV=production
+Environment=HOME=/var/lib/dreambusta
+Environment=DATA_DIR=/var/lib/dreambusta
+Environment=API_HOST=127.0.0.1
+Environment=API_PORT=5276
+Environment=SECURE_COOKIE=1
+Environment=PATH=/opt/dreambusta/node/bin:/usr/bin:/bin
+ExecStart=/opt/dreambusta/node/bin/node --experimental-strip-types server/index.ts
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dreambusta
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

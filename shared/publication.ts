@@ -1,0 +1,1 @@
+export const MAX_PUBLICATION_PAGES = 500;

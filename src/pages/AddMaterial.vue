@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { send, uploadFile, notify } from "../api";
 import Icon from "../components/Icon.vue";
+import PublicationTree from "../components/PublicationTree.vue";
+import type { PublicationNode, ShareImportOptions } from "../../shared/types";
+import { MAX_PUBLICATION_PAGES } from "../../shared/publication";
 const router = useRouter();
 const mode = ref("file");
 const input = ref<HTMLInputElement>();
@@ -14,6 +17,63 @@ const url = ref("");
 const title = ref("");
 const markdown = ref("");
 const provider = ref("");
+const share = ref(false);
+const resolvedUrl = ref("");
+const scope = ref<ShareImportOptions["scope"]>("branch");
+const navigation = ref<PublicationNode[]>([]);
+const selectedUrls = ref<string[]>([]);
+const navigationBusy = ref(false);
+let generation = 0;
+watch(
+  url,
+  () => {
+    generation++;
+    provider.value = "";
+    share.value = false;
+    resolvedUrl.value = "";
+    navigation.value = [];
+    selectedUrls.value = [];
+    scope.value = "branch";
+    navigationBusy.value = false;
+    error.value = "";
+  },
+  { flush: "sync" },
+);
+watch(scope, (value) => {
+  if (value === "menu" && share.value) void loadNavigation();
+});
+function canonicalUrl() {
+  if (resolvedUrl.value) return resolvedUrl.value;
+  const u = new URL(url.value);
+  u.hash = "";
+  u.pathname = u.pathname.replace(/\/$/, "");
+  return u.href;
+}
+async function loadNavigation() {
+  if (navigation.value.length || navigationBusy.value) return;
+  const request = generation;
+  navigationBusy.value = true;
+  error.value = "";
+  try {
+    const nodes = await send<PublicationNode[]>("/links/navigation", "POST", {
+      url: url.value,
+    });
+    if (request !== generation) return;
+    navigation.value = nodes;
+    selectedUrls.value = [
+      ...new Set([...nodes.map((n) => n.sourceUrl), canonicalUrl()]),
+    ];
+  } catch (e) {
+    if (request === generation) error.value = (e as Error).message;
+  } finally {
+    if (request === generation) navigationBusy.value = false;
+  }
+}
+function togglePage(value: string, checked: boolean) {
+  selectedUrls.value = checked
+    ? [...new Set([...selectedUrls.value, value])]
+    : selectedUrls.value.filter((u) => u !== value);
+}
 async function upload(files?: FileList | File[] | null) {
   if (!files?.length || busy.value) return;
   busy.value = true;
@@ -42,27 +102,51 @@ function drop(e: DragEvent) {
   void upload(e.dataTransfer?.files);
 }
 async function preview() {
+  const request = generation;
   error.value = "";
   try {
     const d = await send("/links/preview", "POST", { url: url.value });
+    if (request !== generation) return;
+    share.value = d.type === "share";
+    resolvedUrl.value = d.url;
     provider.value =
       d.provider === "buildin"
         ? "Buildin · сохранённая статья"
         : d.provider === "techhelper"
           ? "TechHelper · опубликованный материал"
           : `${d.provider} · ${d.kind === "audio" ? "аудио" : "видео"}`;
+    if (share.value && scope.value === "menu") void loadNavigation();
   } catch (e) {
+    if (request !== generation) return;
     error.value = (e as Error).message;
     provider.value = "";
   }
 }
 async function addLink() {
+  if (busy.value) return;
+  if (
+    navigationBusy.value ||
+    (share.value && scope.value === "menu" && !navigation.value.length)
+  )
+    return;
   busy.value = true;
   error.value = "";
   try {
+    if (!provider.value) await preview();
+    if (!provider.value) return;
     const m = await send("/links", "POST", {
       url: url.value,
       title: title.value,
+      ...(share.value
+        ? {
+            importOptions: {
+              scope: scope.value,
+              ...(scope.value === "menu"
+                ? { selectedUrls: selectedUrls.value }
+                : {}),
+            },
+          }
+        : {}),
     });
     notify("Материал добавлен");
     await router.push(`/admin/materials/${m.id}`);
@@ -157,12 +241,69 @@ async function article() {
             v-model="url"
             type="url"
             required
+            :disabled="busy"
             placeholder="https://…"
             @blur="url && preview()"
         /></label>
         <div v-if="provider" class="notice success">
           <Icon name="check" />{{ provider }}
         </div>
+        <fieldset v-if="share" class="import-scope" :disabled="busy">
+          <legend>Что сохранить</legend>
+          <label
+            ><input
+              v-model="scope"
+              type="radio"
+              value="article"
+              name="scope"
+            />Только статья</label
+          >
+          <label
+            ><input
+              v-model="scope"
+              type="radio"
+              value="branch"
+              name="scope"
+            />Статья и подстраницы</label
+          >
+          <label
+            ><input v-model="scope" type="radio" value="menu" name="scope" />Всё
+            публичное меню</label
+          >
+          <p class="muted small-text">
+            {{
+              scope === "branch"
+                ? "Сохраним выбранную статью и все вложенные страницы. Новые страницы появятся после ручного обновления ветки."
+                : scope === "menu"
+                  ? "Снимите галочки со страниц, которые не нужны. Исходная статья остаётся в материале."
+                  : "Сохраним только открытую статью. Ссылки на другие страницы ведут к источнику."
+            }}
+          </p>
+          <template v-if="scope === 'menu'">
+            <p v-if="navigationBusy" role="status">Получаем публичное меню…</p>
+            <div v-else-if="navigation.length" class="import-tree">
+              <p class="small-text">
+                Выбрано страниц: {{ selectedUrls.length }} · до {{ MAX_PUBLICATION_PAGES }} страниц /
+                100 МБ
+              </p>
+              <PublicationTree
+                :nodes="navigation"
+                :selected-urls="selectedUrls"
+                :locked-url="canonicalUrl()"
+                :disabled="busy"
+                @toggle="togglePage"
+              />
+            </div>
+            <button
+              v-else
+              type="button"
+              class="button small"
+              @click="loadNavigation"
+            >
+              Повторить загрузку меню
+            </button>
+          </template>
+        </fieldset>
         <label class="field"
           >Название <span class="muted">(можно заполнить после добавления)</span
           ><input
@@ -176,7 +317,14 @@ async function article() {
             Видео воспроизводится из источника и требует сети.</span
           >
         </div>
-        <button class="button primary" :disabled="busy">
+        <button
+          class="button primary"
+          :disabled="
+            busy ||
+            navigationBusy ||
+            (share && scope === 'menu' && !navigation.length)
+          "
+        >
           {{ busy ? "Получаем материал…" : "Добавить в библиотеку" }}
         </button>
       </form>

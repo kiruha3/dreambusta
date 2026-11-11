@@ -6,7 +6,7 @@ export function parseXml(text: string): Document {
 type QueryRoot = Pick<ParentNode, 'querySelectorAll'>;
 export const nodes = (root: QueryRoot, name: string) => Array.from(root.querySelectorAll('*')).filter(e => e.localName.split(':').pop() === name);
 export const value = (root: QueryRoot, name: string) => nodes(root, name)[0]?.textContent?.trim() ?? '';
-export function htmlParagraphs(source: string): string[] {
+export function htmlParagraphs(source: string, anchors?: Map<string, number>): string[] {
   const parser = new DOMParser();
   // EPUB chapters are XHTML: HTML parsing treats <title/> as an unclosed
   // raw-text element and swallows the entire body. Prefer the XML tree.
@@ -23,6 +23,11 @@ export function htmlParagraphs(source: string): string[] {
     if (node.nodeType === 3) { text += node.textContent ?? ''; return; }
     const block = node.nodeType === 1 && /^(p|h[1-6]|div|section|article|li|blockquote|pre|td|dt|dd|br|hr)$/i.test((node as HTMLElement).localName);
     if (block) flush();
+    if (anchors && node.nodeType === 1) {
+      const el = node as Element;
+      const id = el.getAttribute('id') || el.getAttribute('name');
+      if (id && !anchors.has(id)) anchors.set(id, paragraphs.length);
+    }
     Array.from(node.childNodes).forEach(walk);
     if (block) flush();
   };

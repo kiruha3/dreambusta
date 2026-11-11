@@ -96,7 +96,7 @@ export const kindNames = {
 export const modeNames: Record<string, string> = {
   article: "Статья",
   text: "Текст",
-  speed: "Скорочтение",
+  speed: "WBook",
   pdf: "PDF",
   docx: "Документ",
   slides: "Слайды",

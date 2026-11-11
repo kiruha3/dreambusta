@@ -14,10 +14,12 @@ import {
 } from "./auth.ts";
 import type { Material } from "../shared/types.ts";
 import { upload, serveFile } from "./uploads.ts";
-import { Shares, resolveLink } from "./shares.ts";
+import { Shares, resolveLink, validateImportOptions } from "./shares.ts";
 import { saveCover } from "./covers.ts";
 import { cleanHtml, plainParagraphs } from "./processing.ts";
 import { marked } from "marked";
+import { createSourceFetcher } from "./sources/network.ts";
+import { readTrustedSourceOrigins } from "./sources/config.ts";
 
 export class HttpError extends Error {
   status: number;
@@ -83,12 +85,13 @@ export function publicMaterial(m: Material, summary = false) {
         { name, mime, size },
       ]),
     ),
-    ...(summary ? { paragraphs: [], html: "" } : {}),
+    ...(summary ? { paragraphs: [], html: "", pages: [] } : {}),
   };
 }
 export function createApp({ dataDir }: { dataDir: string }) {
+  const sourceFetcher = createSourceFetcher(readTrustedSourceOrigins(dataDir));
   const store = new Store(dataDir);
-  const shares = new Shares(store, dataDir);
+  const shares = new Shares(store, dataDir, sourceFetcher);
   const attempts = new Map<string, { count: number; time: number }>();
   const server = createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -236,7 +239,14 @@ export function createApp({ dataDir }: { dataDir: string }) {
         )
           throw new HttpError(400, "Проверьте ссылку и название");
         if (parts[2] === "preview") return json(res, 200, resolveLink(b.url));
-        return json(res, 201, publicMaterial(await shares.add(b.url, b.title)));
+        if (parts[2] === "navigation")
+          return json(res, 200, await shares.navigation(b.url));
+        const options = validateImportOptions(b.importOptions);
+        return json(
+          res,
+          201,
+          publicMaterial(await shares.add(b.url, b.title, options)),
+        );
       }
       if (parts[1] === "settings") {
         if (!editor) throw new HttpError(401, "Войдите как редактор");

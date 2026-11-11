@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { parseXml, nodes, value, htmlParagraphs, decodeText } from './xml.ts';
 import type { BookDocument } from '../books.ts';
+import { normalizeChapters } from '../chapters.ts';
 
 type ZipStream = {
   on(event: 'data', callback: (chunk: Uint8Array) => void): ZipStream;
@@ -69,10 +70,45 @@ export async function importEpub(file: File, fallback: string): Promise<BookDocu
     const algorithms = nodes(parseXml(await zip.text(encryption)), 'EncryptionMethod').map(e => e.getAttribute('Algorithm') || '');
     if (algorithms.some(a => !/idpf\.org\/2008\/embedding|adobe\.com\/pdf\/enc#RC/i.test(a))) throw new Error('Книга защищена DRM. Нужен файл без защиты.');
   }
-  const manifest = new Map(nodes(opf, 'item').map(e => [e.getAttribute('id'), { href: e.getAttribute('href'), navigation: (e.getAttribute('properties') || '').split(/\s+/).includes('nav') }]));
+  const manifest = new Map(nodes(opf, 'item').map(e => [e.getAttribute('id'), { href: e.getAttribute('href'), mediaType: e.getAttribute('media-type'), navigation: (e.getAttribute('properties') || '').split(/\s+/).includes('nav') }]));
   const resolvePath = (href: string) => decodeURIComponent(new URL(href, 'https://ebook.invalid/' + root).pathname.slice(1));
+  const toc: { title: string; target: string }[] = [];
+  const addTarget = (title: string, href: string | null, from: string) => {
+    if (!title.trim() || !href) return;
+    const target = new URL(href, 'https://ebook.invalid/' + from);
+    if (target.origin !== 'https://ebook.invalid') return;
+    if (toc.length >= 10000) throw new Error('В оглавлении больше 10000 разделов.');
+    toc.push({ title: title.trim().replace(/\s+/gu, ' ').slice(0, 200), target: decodeURIComponent(target.pathname.slice(1)) + decodeURIComponent(target.hash) });
+  };
+  try {
+  const navItem = [...manifest.values()].find(item => item.navigation && item.href);
+  if (navItem?.href) {
+    const path = resolvePath(navItem.href);
+    const entry = zip.file(path);
+    if (entry) {
+      const doc = parseXml(await zip.text(entry));
+      const navs = nodes(doc, 'nav');
+      const nav = navs.find(el => (el.getAttribute('epub:type') || el.getAttribute('type') || '').split(/\s+/).includes('toc')) || navs[0];
+      if (nav) for (const link of nodes(nav, 'a')) addTarget(link.textContent || '', link.getAttribute('href'), path);
+    }
+  }
+  if (!toc.length) {
+    const spine = nodes(opf, 'spine')[0];
+    const ncx = manifest.get(spine?.getAttribute('toc') || '') || [...manifest.values()].find(item => item.mediaType === 'application/x-dtbncx+xml');
+    const path = ncx?.href ? resolvePath(ncx.href) : '';
+    const entry = path && zip.file(path);
+    if (entry) for (const point of nodes(parseXml(await zip.text(entry)), 'navPoint'))
+      addTarget(value(point, 'text'), nodes(point, 'content')[0]?.getAttribute('src') || null, path);
+  }
+  } catch (error) {
+    // Navigation is optional: unreadable labels/URLs must not discard a valid spine.
+    // Archive expansion protection still applies to every resource, including TOCs.
+    if (error instanceof Error && error.message.includes('лимит распаковки')) throw error;
+    toc.length = 0;
+  }
   const navigationPaths = new Set(nodes(opf, 'reference').filter(e => (e.getAttribute('type') || '').split(/\s+/).includes('toc')).map(e => e.getAttribute('href')).filter((h): h is string => !!h).map(resolvePath));
   const paragraphs: string[] = [];
+  const targets = new Map<string, number>();
   for (const ref of nodes(opf, 'itemref')) {
     const item = manifest.get(ref.getAttribute('idref'));
     if (item?.navigation) continue;
@@ -82,9 +118,16 @@ export async function importEpub(file: File, fallback: string): Promise<BookDocu
     if (navigationPaths.has(path)) continue;
     const chapter = zip.file(path);
     if (!chapter) throw new Error('В EPUB отсутствует файл главы.');
-    paragraphs.push(...htmlParagraphs(await zip.text(chapter)));
+    const anchors = new Map<string, number>();
+    const content = htmlParagraphs(await zip.text(chapter), anchors);
+    if (content.length) {
+      targets.set(path, paragraphs.length);
+      for (const [anchor, at] of anchors) if (at < content.length) targets.set(`${path}#${anchor}`, paragraphs.length + at);
+    }
+    for (const p of content) paragraphs.push(p);
   }
-  return { title: value(opf, 'title') || fallback, author: nodes(opf, 'creator').map(e => e.textContent?.trim()).filter(Boolean).join(', '), paragraphs };
+  const chapters = normalizeChapters(toc.flatMap(item => targets.has(item.target) ? [{title:item.title,paragraph:targets.get(item.target)!}] : []), paragraphs.length);
+  return { title: value(opf, 'title') || fallback, author: nodes(opf, 'creator').map(e => e.textContent?.trim()).filter(Boolean).join(', '), paragraphs, ...(chapters.length ? {chapters} : {}) };
 }
 export async function importDocx(file: File, fallback: string): Promise<BookDocument> {
   const zip = await openArchive(file);

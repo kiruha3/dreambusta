@@ -1,6 +1,21 @@
 export type Kind = "book" | "document" | "presentation" | "video" | "audio";
+export interface BookChapter { title: string; paragraph: number }
 export type Representation =
   "article" | "text" | "pdf" | "docx" | "slides" | "video" | "audio";
+export interface ShareImportOptions {
+  scope: "article" | "branch" | "menu";
+  selectedUrls?: string[];
+}
+export interface PublicationNode {
+  sourceUrl: string;
+  parentSourceUrl?: string;
+  title: string;
+  icon?: PublicationIcon | null;
+}
+export interface PublicationIcon {
+  type: "emoji" | "image";
+  value: string;
+}
 export interface Source {
   type: "file" | "share" | "link";
   url?: string;
@@ -9,6 +24,7 @@ export interface Source {
   checkedAt?: string;
   status?: "saved" | "unavailable" | "error" | "removed";
   message?: string;
+  importOptions?: ShareImportOptions;
 }
 export interface FileRef {
   path: string;
@@ -16,6 +32,16 @@ export interface FileRef {
   mime: string;
   size: number;
   sha256?: string;
+}
+export interface PublicationPage {
+  sourceUrl: string;
+  parentSourceUrl?: string;
+  slug: string;
+  title: string;
+  html: string;
+  paragraphs: string[];
+  wordCount: number;
+  icon?: PublicationIcon | null;
 }
 export interface Material {
   id: string;
@@ -33,6 +59,12 @@ export interface Material {
   representations: Representation[];
   paragraphs: string[];
   html: string;
+  pages?: PublicationPage[];
+  chapters?: BookChapter[];
+  navigation?: PublicationNode[];
+  pageAddresses?: Record<string, string>;
+  sourcePageId?: string;
+  icon?: PublicationIcon | null;
   files: Record<string, FileRef>;
   warnings: string[];
   textVersion: number;

@@ -54,6 +54,29 @@ test('EPUB keeps nonlinear notes and excludes actual navigation', async () => {
   const doc = await importBook(new File([await zip.generateAsync({type:'arraybuffer'})], 'notes.epub'));
   assert.deepEqual(doc.paragraphs, ['Main chapter.', 'AUTHOR NOTE.']);
 });
+
+for (const version of ['ncx', 'nav']) test(`EPUB ${version} maps source chapter labels to anchors inside the same spine item`, async () => {
+  const zip = new JSZip();
+  zip.file('META-INF/container.xml', '<container><rootfile full-path="OPS/book.opf"/></container>');
+  zip.file('OPS/book.opf', `<package><metadata><title>Книга</title></metadata><manifest><item id="main" href="main.xhtml"/><item id="toc" href="${version === 'ncx' ? 'book.ncx' : 'nav.xhtml'}" ${version === 'ncx' ? 'media-type="application/x-dtbncx+xml"' : 'properties="nav"'}/></manifest><spine toc="toc"><itemref idref="main"/></spine></package>`);
+  zip.file('OPS/main.xhtml', '<html><body><p>Вступление.</p><section id="first"><h1>Начало</h1><p>Первый текст.</p></section><h2 id="second">Продолжение</h2><p>Второй текст.</p></body></html>');
+  if (version === 'ncx') zip.file('OPS/book.ncx', '<ncx><navMap><navPoint><navLabel><text>Первая история</text></navLabel><content src="main.xhtml#first"/></navPoint><navPoint><navLabel><text>Вторая история</text></navLabel><content src="main.xhtml#second"/></navPoint></navMap></ncx>');
+  else zip.file('OPS/nav.xhtml', '<html xmlns:epub="epub"><body><nav epub:type="toc"><ol><li><a href="main.xhtml#first">Первая история</a></li><li><a href="main.xhtml#second">Вторая история</a></li></ol></nav><nav epub:type="landmarks"><a href="main.xhtml">Не глава</a></nav></body></html>');
+  const doc = await importBook(new File([await zip.generateAsync({type:'arraybuffer'})], 'chapters.epub'));
+  assert.deepEqual(doc.paragraphs, ['Вступление.', 'Начало', 'Первый текст.', 'Продолжение', 'Второй текст.']);
+  assert.deepEqual(doc.chapters, [{title:'Первая история',paragraph:1},{title:'Вторая история',paragraph:3}]);
+});
+
+for (const href of ['main.xhtml#bad%ZZ','http://[broken']) test(`malformed optional EPUB navigation ${href} does not discard readable chapter text`, async () => {
+  const zip=new JSZip();
+  zip.file('META-INF/container.xml','<container><rootfile full-path="book.opf"/></container>');
+  zip.file('book.opf','<package><manifest><item id="main" href="main.xhtml"/><item id="nav" href="nav.xhtml" properties="nav"/></manifest><spine><itemref idref="main"/></spine></package>');
+  zip.file('main.xhtml','<html><body><h1>Глава 1. Начало</h1><p>Текст читаемой книги.</p></body></html>');
+  zip.file('nav.xhtml',`<html><body><nav><a href="${href}">Повреждённая ссылка оглавления</a></nav></body></html>`);
+  const doc=await importBook(new File([await zip.generateAsync({type:'arraybuffer'})],'valid-text.epub'));
+  assert.deepEqual(doc.paragraphs,['Глава 1. Начало','Текст читаемой книги.']);
+  assert.equal(doc.chapters,undefined);
+});
 test('DOCX extracts text runs and paragraph boundaries', async () => {
   const zip = new JSZip();
   zip.file('word/document.xml', '<w:document xmlns:w="word"><w:body><w:p><w:r><w:t>Привет, </w:t></w:r><w:r><w:t>мир!</w:t></w:r></w:p><w:p><w:r><w:t>Абзац два.</w:t></w:r></w:p></w:body></w:document>');

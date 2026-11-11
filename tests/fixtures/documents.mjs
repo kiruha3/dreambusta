@@ -1,4 +1,21 @@
 import JSZip from "jszip";
+import { readFileSync } from "node:fs";
+
+export function makeJpxPdf() {
+  const image = Buffer.from(readFileSync(new URL('./jpx-image.b64', import.meta.url), 'utf8').trim(), 'base64');
+  const content = Buffer.from('q 300 0 0 200 0 0 cm /Im0 Do Q');
+  const objects = [
+    Buffer.from('<< /Type /Catalog /Pages 2 0 R >>'),
+    Buffer.from('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    Buffer.from('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'),
+    Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width 160 /Height 100 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode /Length ${image.length} >>\nstream\n`), image, Buffer.from('\nendstream')]),
+    Buffer.concat([Buffer.from(`<< /Length ${content.length} >>\nstream\n`),content,Buffer.from('\nendstream')]),
+  ];
+  const chunks=[Buffer.from('%PDF-1.7\n')]; const offsets=[0]; let size=chunks[0].length;
+  objects.forEach((o,i)=>{offsets.push(size);const b=Buffer.concat([Buffer.from(`${i+1} 0 obj\n`),o,Buffer.from('\nendobj\n')]);chunks.push(b);size+=b.length;});
+  chunks.push(Buffer.from(`xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')}trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${size}\n%%EOF`));
+  return Buffer.concat(chunks);
+}
 export function makePdf(text = "", pageCount = 1) {
   const content = `BT /F1 18 Tf 60 700 Td (${text}) Tj ET`;
   const kids = Array.from(
@@ -77,6 +94,24 @@ export async function makePptx() {
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
+// Empty <ln/> and uninstalled fonts occur in exported customer decks.
+export async function makeStyledPptx() {
+  const zip = await JSZip.loadAsync(await makePptx());
+  const original = await zip.file("ppt/slides/slide2.xml").async("string");
+  const text = original
+    .replace(/<a:solidFill>.*?<\/a:solidFill>/s, "<a:noFill/><a:ln/>")
+    .replace(
+      /<a:p>.*?<\/a:p>/s,
+      `<a:p><a:r><a:rPr sz="3200"><a:latin typeface="UnavailableSlideFont"/><a:solidFill><a:srgbClr val="0EA5E9"/></a:solidFill></a:rPr><a:t>▶</a:t></a:r><a:r><a:rPr sz="2400" b="1"><a:latin typeface="UnavailableSlideFont"/><a:solidFill><a:srgbClr val="0F172A"/></a:solidFill></a:rPr><a:t> Основной текст</a:t></a:r></a:p>`,
+    );
+  const frame = `<p:sp><p:nvSpPr><p:cNvPr id="3" name="Rounded frame"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="2743200"/><a:ext cx="3200400" cy="914400"/></a:xfrm><a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 8000"/></a:avLst></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln/><a:effectLst><a:outerShdw blurRad="304800" dist="127000" dir="5400000"><a:srgbClr val="0F172A"><a:alpha val="10000"/></a:srgbClr></a:outerShdw></a:effectLst></p:spPr></p:sp>`;
+  zip.file(
+    "ppt/slides/slide2.xml",
+    text.replace("</p:spTree>", frame + "</p:spTree>"),
+  );
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
 export async function makeDensePptx() {
   const zip = await JSZip.loadAsync(await makePptx());
   const ns = "http://schemas.openxmlformats.org";
@@ -103,5 +138,37 @@ export async function makeDensePptx() {
         .replace(/<a:p>.*<\/a:p>/s, paragraphs),
     );
   }
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+export async function makeTablePptx() {
+  const zip = await JSZip.loadAsync(await makePptx());
+  const xml = await zip.file("ppt/slides/slide2.xml").async("string");
+  const ns = "http://schemas.openxmlformats.org";
+  const cell = (text, attrs = "", header = false) =>
+    `<a:tc ${attrs}><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="1400" b="${header ? 1 : 0}"><a:latin typeface="Arial"/><a:solidFill><a:srgbClr val="0F172A"/></a:solidFill></a:rPr><a:t>${text}</a:t></a:r></a:p></a:txBody><a:tcPr marL="38100" marR="38100" marT="38100" marB="38100" anchor="ctr">${["L", "R", "T", "B"].map((side) => `<a:ln${side} w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln${side}>`).join("")}${header ? '<a:solidFill><a:srgbClr val="E2E8F0"/></a:solidFill>' : ""}</a:tcPr></a:tc>`;
+  const rows = [
+    cell("Реквизиты", 'gridSpan="2"', true) +
+      cell("", 'hMerge="1"') +
+      cell("Тип", "", true),
+    cell("Заказчик", 'rowSpan="2"') + cell("Название") + cell("Текст"),
+    cell("", 'vMerge="1"') + cell("Контракт") + cell("Номер"),
+  ]
+    .map((cells) => `<a:tr h="381000">${cells}</a:tr>`)
+    .join("");
+  const table = `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="3" name="Таблица"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="1828800"/><a:ext cx="3429000" cy="1143000"/></p:xfrm><a:graphic><a:graphicData uri="${ns}/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid><a:gridCol w="952500"/><a:gridCol w="1524000"/><a:gridCol w="952500"/></a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+  zip.file(
+    "ppt/slides/slide2.xml",
+    xml.replace("</p:spTree>", table + "</p:spTree>"),
+  );
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+export async function makeVectorPptx() {
+  const zip = await JSZip.loadAsync(await makePptx());
+  const xml = await zip.file("ppt/slides/slide2.xml").async("string");
+  const freeform = `<p:sp><p:nvSpPr><p:cNvPr id="3" name="Vector icon"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="2743200"/><a:ext cx="914400" cy="457200"/></a:xfrm><a:custGeom><a:avLst/><a:gdLst/><a:pathLst><a:path w="100" h="100"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="100" y="0"/></a:lnTo><a:cubicBezTo><a:pt x="100" y="50"/><a:pt x="50" y="100"/><a:pt x="0" y="100"/></a:cubicBezTo><a:close/></a:path><a:path w="100" h="100" fill="none" stroke="0"><a:moveTo><a:pt x="10" y="10"/></a:moveTo><a:quadBezTo><a:pt x="50" y="50"/><a:pt x="90" y="10"/></a:quadBezTo></a:path></a:pathLst></a:custGeom><a:solidFill><a:srgbClr val="94A3B8"><a:alpha val="50000"/></a:srgbClr></a:solidFill><a:ln/></p:spPr></p:sp>`;
+  const glow = `<p:sp><p:nvSpPr><p:cNvPr id="4" name="Gradient glow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="3657600" y="2743200"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="ellipse"/><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="0EA5E9"><a:alpha val="6000"/></a:srgbClr></a:gs><a:gs pos="100000"><a:srgbClr val="0EA5E9"><a:alpha val="0"/></a:srgbClr></a:gs></a:gsLst><a:path path="circle"/></a:gradFill><a:ln/></p:spPr></p:sp>`;
+  zip.file("ppt/slides/slide2.xml", xml.replace("</p:spTree>", freeform + glow + "</p:spTree>"));
   return zip.generateAsync({ type: "nodebuffer" });
 }

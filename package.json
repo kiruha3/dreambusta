@@ -10,7 +10,7 @@
     "dev": "node scripts/dev.mjs",
     "api": "node --experimental-strip-types server/index.ts",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 5175",
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "vue-tsc --noEmit",
     "test:e2e": "node tests/e2e.mjs"

@@ -2,6 +2,7 @@ import { DOMParser, parseHTML } from "linkedom";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { importBook } from "../lib/import.ts";
+import { MAX_TEXT_SIZE } from "../lib/books.ts";
 import { importDocx } from "../lib/formats/archive.ts";
 import { importPdf } from "../lib/formats/pdf.ts";
 import { decodeText } from "../lib/formats/xml.ts";
@@ -58,22 +59,27 @@ export function cleanHtml(value: string) {
       "summary",
     ],
     allowedAttributes: {
-      a: ["href", "title"],
+      a: ["href", "title", "target", "rel"],
       img: ["src", "alt", "width", "height"],
-      "*": [],
+      "*": ["id"],
     },
     allowedSchemes: ["https", "http"],
     allowProtocolRelative: false,
     transformTags: {
-      a: sanitizeHtml.simpleTransform("a", {
-        rel: "noopener noreferrer",
-        target: "_blank",
+      a: (_tag, attrs) => ({
+        tagName: "a",
+        attribs: {
+          ...attrs,
+          rel: "noopener noreferrer",
+          target: attrs.href?.startsWith("#") ? "_self" : "_blank",
+        },
       }),
     },
   });
 }
 export function plainParagraphs(html: string) {
   const { document } = parseHTML(`<html><body>${html}</body></html>`);
+  document.querySelectorAll(".publication-link-icon").forEach(el => el.remove());
   for (const br of document.querySelectorAll("br")) br.replaceWith("\n");
   const blocks = document.querySelectorAll(
     "p,h1,h2,h3,h4,h5,h6,li,pre,tr,blockquote",
@@ -101,6 +107,7 @@ export async function processFile(file: File): Promise<Processed> {
     title: file.name.replace(/\.(fb2\.zip|[^.]+)$/i, ""),
     kind: "document",
     paragraphs: [],
+    chapters: [],
     html: "",
     representations: [],
     warnings: [],
@@ -140,9 +147,21 @@ export async function processFile(file: File): Promise<Processed> {
       objects.flatMap((o) =>
         o.kind === "group"
           ? collect(o.objects)
-          : o.text?.content
-            ? [o.text.content]
-            : [],
+          : o.kind === "table"
+            ? (() => {
+                const rows = new Map<number, string[]>();
+                for (const cell of o.cells) {
+                  const text = cell.text.content.trim();
+                  if (!text) continue;
+                  const row = rows.get(cell.row) ?? [];
+                  row.push(text);
+                  rows.set(cell.row, row);
+                }
+                return [...rows.values()].map((row) => row.join(" · "));
+              })()
+            : o.text?.content
+              ? [o.text.content]
+              : [],
       );
     result.paragraphs = doc.scene.slides.flatMap((s, i) => {
       const text = collect(s.objects);
@@ -150,7 +169,17 @@ export async function processFile(file: File): Promise<Processed> {
     });
     result.warnings = [
       "Статический просмотр: анимация, видео и сложные объекты PowerPoint могут не отображаться.",
-      ...Array.from(new Set(doc.scene.warnings.map((w) => w.detail || w.code))),
+      ...Array.from(
+        new Set(
+          doc.scene.warnings.map((w) =>
+            w.code === "unsupported_effects"
+              ? "Тени и некоторые эффекты показаны упрощённо."
+              : w.code === "unsupported_text_features"
+                ? "Некоторые дополнительные свойства текста могут отличаться от PowerPoint."
+                : "Некоторые сложные объекты пока не поддерживаются просмотрщиком.",
+          ),
+        ),
+      ),
     ].slice(0, 20);
   } else if (ext === "doc") {
     throw new Error(
@@ -164,12 +193,13 @@ export async function processFile(file: File): Promise<Processed> {
     result.title = book.title;
     result.paragraphs = book.paragraphs;
     result.author = book.author;
+    result.chapters = book.chapters || [];
     if (ext === "docx") result.representations = ["docx"];
     else result.kind = "book";
   }
   result.paragraphs = result.paragraphs!.map((s) => s.trim()).filter(Boolean);
-  if (result.paragraphs.join("").length > 10 * 1024 * 1024)
-    throw new Error("Текст превышает 10 МБ");
+  if (new TextEncoder().encode(result.paragraphs.join("\n\n")).byteLength > MAX_TEXT_SIZE)
+    throw new Error("Текст превышает 50 МБ");
   result.wordCount = result.paragraphs
     .join(" ")
     .split(/\s+/u)

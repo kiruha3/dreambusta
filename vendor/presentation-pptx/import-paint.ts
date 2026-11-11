@@ -41,7 +41,9 @@ export function shapePaint(shape: Element, context: ShapeContext): Pick<Presenta
 }
 function stroke(paint: Paint | undefined, context: ShapeContext): PresentationShape['stroke'] {
   if (!paint || child(paint.node, 'noFill')) return null
-  return { color: paintColor(paint, context) ?? { r: 0, g: 0, b: 0, a: 1 }, width: numeric(paint.node, 'w', 12700) / EMU_PER_PIXEL * context.space.scaleY }
+  const color = paintColor(paint, context)
+  // An empty <a:ln/> has no line paint; inventing black adds frames to text boxes.
+  return color ? { color, width: numeric(paint.node, 'w', 12700) / EMU_PER_PIXEL * context.space.scaleY } : null
 }
 /** Resolves the nearest inherited slide background. */
 export function background(roots: (Element | undefined)[], context: ShapeContext): PresentationColor | null {

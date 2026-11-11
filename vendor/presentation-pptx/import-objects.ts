@@ -6,6 +6,8 @@ import { child, children, descendants } from './xml.ts'
 import { inheritedChild, shapeSources } from './inheritance.ts'
 import { groupSpace, hasShear, lineBox, readBox } from './geometry.ts'
 import { readText } from './text.ts'
+import { readTable } from './import-table.ts'
+import { readPaths, readGradient } from './import-vector.ts'
 import { readImage } from './images.ts'
 import { shapePaint } from './import-paint.ts'
 import { hasMedia, unsupportedLabel, unsupportedVisual } from './unsupported.ts'
@@ -33,7 +35,9 @@ function unsupported(base: PresentationObjectBase, label: string, state: ObjectI
   return { ...base, kind: 'unsupported', label, locked: true, capabilities: { geometry: false, text: false, style: false, remove: false } }
 }
 function importShape(shape: Element, context: ShapeContext, base: PresentationObjectBase, state: ObjectImport): PresentationObject {
-  if (unsupportedVisual(shape)) return unsupported(base, 'shape', state)
+  const paths = readPaths(shape, base.box, context)
+  const gradient = readGradient(shape, context)
+  if (unsupportedVisual(shape, false, [...(paths ? ['custGeom'] : []), ...(gradient ? ['gradFill'] : [])])) return unsupported(base, 'shape', state)
   const text = readText(shape, context)
   const paint = shapePaint(shape, context)
   if (plainTextBox(shape, text, paint)) return { ...base, kind: 'text', text }
@@ -41,7 +45,18 @@ function importShape(shape: Element, context: ShapeContext, base: PresentationOb
   const kind = basicShape(preset)
   if (!kind) return unsupported(base, 'shape', state)
   const box = kind === 'line' ? lineBox(base.box) : base.box
-  return { ...base, box, kind: 'shape', shape: kind, ...paint, text }
+  if (descendants(shape, 'effectLst').some(effect => children(effect).length))
+    state.warnings.push({ code: 'unsupported_effects', objectId: base.id })
+  const adjustment = children(child(child(child(shape, 'spPr'), 'prstGeom'), 'avLst'))
+    .find(value => value.getAttribute('name') === 'adj')?.getAttribute('fmla')
+  const radius = /^val\s+([0-9]+)$/.exec(adjustment ?? '')
+  const cornerRadius = preset === 'roundRect'
+    ? Math.min(box.width, box.height) * Math.min(50000, Number(radius?.[1] ?? 16667)) / 100000
+    : undefined
+  return { ...base, box, kind: 'shape', shape: kind, ...paint, text, ...(cornerRadius === undefined ? {} : { cornerRadius }),
+    ...(paths ? { paths } : {}), ...(gradient ? { gradient } : {}),
+    ...(paths || gradient ? { locked: true, capabilities: { geometry: false, text: false, style: false, remove: false } } : {}),
+  }
 }
 function importGroup(shape: Element, context: ShapeContext, base: PresentationObjectBase, state: ObjectImport): PresentationObject {
   const space = groupSpace(properties(shape, context), context.space)
@@ -52,7 +67,7 @@ function isTextBox(shape: Element): boolean {
   return child(child(shape, 'nvSpPr'), 'cNvSpPr')?.getAttribute('txBox') === '1'
 }
 function basicShape(preset: string) {
-  return ({ rect: 'rectangle', ellipse: 'ellipse', line: 'line' } as const)[preset]
+  return ({ rect: 'rectangle', roundRect: 'rectangle', ellipse: 'ellipse', line: 'line' } as const)[preset]
 }
 function readOne(shape: Element, context: ShapeContext, base: PresentationObjectBase, state: ObjectImport): PresentationObject {
   if (base.locked && !context.inherited) return unsupported(base, 'groupTransform', state)
@@ -60,6 +75,10 @@ function readOne(shape: Element, context: ShapeContext, base: PresentationObject
   if (shape.localName === 'sp') return importShape(shape, context, base, state)
   if (shape.localName === 'grpSp') return importGroup(shape, context, base, state)
   if (shape.localName === 'pic') return readImage(shape, context, base, state.assets) ?? unsupported(base, 'imageFormat', state)
+  if (shape.localName === 'graphicFrame') {
+    const table = readTable(shape, context, base)
+    if (table) return table
+  }
   return unsupported(base, unsupportedLabel(shape), state)
 }
 function importObject(shape: Element, context: ShapeContext, state: ObjectImport): PresentationObject {

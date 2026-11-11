@@ -8,7 +8,6 @@ defineProps<{
   sourceUrl?: string;
 }>();
 const error = ref(false);
-const activated = ref(false);
 </script>
 <template>
   <div v-if="kind === 'audio'" class="audio-frame">
@@ -19,28 +18,16 @@ const activated = ref(false);
       @error="error = true"
     ></audio>
   </div>
-  <template v-else-if="provider && ['youtube', 'rutube', 'vk'].includes(provider)"
-    ><div v-if="!activated" class="empty">
-      <Icon name="video" :size="45" />
-      <h2>Видео · {{ provider }}</h2>
-      <p>
-        Плеер загрузится с сайта источника. Доступность зависит от его настроек
-        и вашего соединения.
-      </p>
-      <button class="button primary" @click="activated = true">
-        <Icon name="play" />Загрузить плеер
-      </button>
-    </div>
-    <iframe
-      v-else
+  <iframe
+      v-else-if="provider && ['youtube', 'rutube', 'vk'].includes(provider)"
       class="media-frame"
       :src="src"
       title="Видеоматериал"
       allow="fullscreen; picture-in-picture; encrypted-media"
       allowfullscreen
       referrerpolicy="strict-origin-when-cross-origin"
-    ></iframe></template
-  ><video
+    ></iframe>
+  <video
     v-else
     controls
     playsinline

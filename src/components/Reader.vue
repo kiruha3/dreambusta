@@ -18,17 +18,39 @@ import {
 } from "../../lib/reader";
 import Icon from "./Icon.vue";
 import BookText from "./BookText.vue";
+import ChapterControls from "./ChapterControls.vue";
+import { wordChapters, chapterAt } from "../../lib/chapters";
+import type { BookChapter } from "../../shared/types";
 const props = defineProps<{
   paragraphs: string[];
   materialId: string;
   textVersion: number;
   speedMode: boolean;
+  chapters?: BookChapter[];
 }>();
 const tokens = computed(() => tokenize(props.paragraphs));
 const index = ref(0);
 const speed = ref(300);
 const playing = ref(false);
 const completed = ref(false);
+const chapterCompleted = ref(false);
+const chapterList = ref<BookChapter[]>([]);
+const chaptersEnabled = ref(false);
+const ranges = computed(() => wordChapters(chapterList.value, tokens.value));
+const activeChapter = computed(
+  () => ranges.value[chapterAt(ranges.value, index.value)],
+);
+const chapterMode = computed(
+  () => props.speedMode && chaptersEnabled.value && !!activeChapter.value,
+);
+const contextTokens = computed(() =>
+  chapterMode.value
+    ? tokens.value.slice(activeChapter.value.start, activeChapter.value.end)
+    : tokens.value,
+);
+const readingEnd = computed(() =>
+  chapterMode.value ? activeChapter.value.end : tokens.value.length,
+);
 const warning = ref("");
 const fontSize = ref(18);
 const search = ref("");
@@ -87,8 +109,9 @@ function schedule() {
   clearTimeout(timer);
   timer = setTimeout(
     () => {
-      if (index.value >= tokens.value.length - 1) {
-        completed.value = true;
+      if (index.value >= readingEnd.value - 1) {
+        completed.value = index.value >= tokens.value.length - 1;
+        chapterCompleted.value = chapterMode.value;
         stop();
         return;
       }
@@ -101,9 +124,10 @@ function schedule() {
 }
 function start() {
   if (!tokens.value.length) return;
-  if (completed.value) {
-    index.value = 0;
+  if (completed.value || chapterCompleted.value) {
+    index.value = chapterMode.value ? activeChapter.value.start : 0;
     completed.value = false;
+    chapterCompleted.value = false;
   }
   playing.value = true;
   schedule();
@@ -116,7 +140,20 @@ function seek(to: number) {
   stop();
   index.value = Math.max(0, Math.min(tokens.value.length - 1, Math.floor(to)));
   completed.value = false;
+  chapterCompleted.value = false;
   save();
+  if (props.speedMode) void nextTick(currentPlace);
+}
+function changeChapters(chapters: BookChapter[], enabled: boolean) {
+  stop();
+  chapterCompleted.value = false;
+  chapterList.value = chapters;
+  chaptersEnabled.value = enabled;
+  void nextTick(currentPlace);
+}
+function selectChapter(paragraph: number) {
+  const range = ranges.value.find((c) => c.paragraph === paragraph);
+  if (range) seek(range.start);
 }
 watch(speed, () => {
   save();
@@ -133,6 +170,7 @@ watch(
     void nextTick(() => {
       fit();
       attachResize();
+      currentPlace();
     });
   },
 );
@@ -143,6 +181,7 @@ watch(
     playing.value = false;
     startedAt = null;
     pointer = undefined;
+    chapterCompleted.value = false;
     try {
       const raw = localStorage.getItem(key.value);
       const p = restoreProgress(raw, tokens.value.length);
@@ -240,119 +279,142 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <div v-if="warning" class="notice warning">{{ warning }}</div>
-  <template v-if="!speedMode"
-    ><div class="text-toolbar">
-      <label class="search-box"
-        ><Icon name="search" :size="15" /><input
-          v-model="search"
-          placeholder="Поиск в тексте"
-          aria-label="Поиск в тексте"
-      /></label>
-      <div class="row gap8">
+  <div class="reader-layout" :class="{ 'speed-reading': speedMode }">
+    <div v-if="warning" class="notice warning">{{ warning }}</div>
+    <ChapterControls
+      v-if="speedMode"
+      :paragraphs="paragraphs"
+      :chapters="chapters"
+      :paragraph="current?.paragraph || 0"
+      :storage-key="`dreambusta-chapters:${materialId}:${textVersion}`"
+      @change="changeChapters"
+      @select="selectChapter"
+    />
+    <template v-if="speedMode"
+      ><div
+        ref="stage"
+        class="focus-stage"
+        tabindex="0"
+        aria-label="Удерживайте для чтения; двигайте вверх быстрее, вниз медленнее"
+        @pointerdown="down"
+        @pointermove="move"
+        @pointerup="stop"
+        @pointercancel="stop"
+        @lostpointercapture="stop"
+        @contextmenu.prevent
+      >
+        <div class="focus-guides"></div>
+        <div class="focus-word" :style="{ fontSize: wordFont + 'px' }">
+          <span class="focus-before">{{ focus.before }}</span
+          ><em>{{ focus.focus }}</em
+          ><span class="focus-after">{{ focus.after }}</span>
+        </div>
+        <div class="focus-hint">
+          {{
+            chapterCompleted
+              ? "Глава прочитана. Можно перейти к следующей."
+              : completed
+                ? "Материал прочитан. Можно начать заново."
+                : "Удерживайте для чтения · вверх быстрее, вниз медленнее"
+          }}
+        </div>
+      </div></template
+    >
+    <div class="reader-controls" :data-index="index">
+      <div v-if="speedMode" class="row speed-row">
         <button
           class="icon-button"
-          aria-label="Уменьшить шрифт"
-          @click="fontSize = Math.max(14, fontSize - 1)"
+          aria-label="Назад на 10 слов"
+          @click="seek(index - 10)"
         >
-          A−</button
+          <Icon name="left" /></button
+        ><button
+          class="button primary play-button"
+          :aria-label="playing ? 'Пауза' : 'Начать чтение'"
+          @click="toggle"
+        >
+          <Icon :name="playing ? 'pause' : 'play'" :size="20" /></button
         ><button
           class="icon-button"
-          aria-label="Увеличить шрифт"
-          @click="fontSize = Math.min(28, fontSize + 1)"
+          aria-label="Вперёд на 10 слов"
+          @click="seek(index + 10)"
         >
-          A+
-        </button>
+          <Icon name="right" /></button
+        ><input
+          v-model.number="speed"
+          class="speed-slider"
+          type="range"
+          min="60"
+          max="1200"
+          step="5"
+          aria-label="Скорость чтения"
+        /><span>{{ speed }} слов/мин</span>
       </div>
-      <button class="button small" @click="currentPlace">Моё место</button>
-    </div>
-    <BookText
-      ref="textBox"
-      :tokens="tokens"
-      :index="index"
-      :font-size="fontSize"
-      :search="search"
-      @select="seek"
-  /></template>
-  <template v-else
-    ><div
-      ref="stage"
-      class="focus-stage"
-      tabindex="0"
-      aria-label="Удерживайте для чтения; двигайте вверх быстрее, вниз медленнее"
-      @pointerdown="down"
-      @pointermove="move"
-      @pointerup="stop"
-      @pointercancel="stop"
-      @lostpointercapture="stop"
-      @contextmenu.prevent
-    >
-      <div class="focus-guides"></div>
-      <div class="focus-word" :style="{ fontSize: wordFont + 'px' }">
-        <span class="focus-before">{{ focus.before }}</span
-        ><em>{{ focus.focus }}</em
-        ><span class="focus-after">{{ focus.after }}</span>
+      <div class="reader-progress-row">
+        <span>{{ percent }}%</span
+        ><input
+          type="range"
+          :value="index"
+          min="0"
+          :max="Math.max(0, tokens.length - 1)"
+          aria-label="Позиция в тексте"
+          @input="seek(Number(($event.target as HTMLInputElement).value))"
+        /><span
+          >{{ Math.min(index + 1, tokens.length).toLocaleString("ru") }} /
+          {{ tokens.length.toLocaleString("ru") }}</span
+        >
       </div>
-      <div class="focus-hint">
+      <small class="muted" style="font-size: 10px"
+        >Позиция хранится в этом браузере ·
         {{
-          completed
-            ? "Материал прочитан. Можно начать заново."
-            : "Удерживайте для чтения · вверх быстрее, вниз медленнее"
+          speedMode
+            ? "Пробел — старт/пауза, стрелки — позиция и скорость"
+            : "Нажмите на слово, чтобы продолжить с него"
+        }}</small
+      >
+    </div>
+    <section class="reader-full-text" aria-label="Полный текст">
+      <h3 v-if="speedMode" class="reader-text-heading">
+        <Icon name="book" :size="16" />{{
+          chapterMode ? "Текст главы" : "Полный текст"
         }}
+        <small class="muted">Нажмите на слово, чтобы продолжить с него</small>
+      </h3>
+      <div class="text-toolbar">
+        <label class="search-box"
+          ><Icon name="search" :size="15" /><input
+            v-model="search"
+            placeholder="Поиск в тексте"
+            aria-label="Поиск в тексте"
+        /></label>
+        <div class="row gap8">
+          <button
+            class="icon-button"
+            aria-label="Уменьшить шрифт"
+            @click="fontSize = Math.max(14, fontSize - 1)"
+          >
+            A−
+          </button>
+          <button
+            class="icon-button"
+            aria-label="Увеличить шрифт"
+            @click="fontSize = Math.min(28, fontSize + 1)"
+          >
+            A+
+          </button>
+        </div>
+        <button class="button small" @click="currentPlace">Моё место</button>
       </div>
-    </div></template
-  >
-  <div class="reader-controls" :data-index="index">
-    <div v-if="speedMode" class="row speed-row">
-      <button
-        class="icon-button"
-        aria-label="Назад на 10 слов"
-        @click="seek(index - 10)"
-      >
-        <Icon name="left" /></button
-      ><button
-        class="button primary play-button"
-        :aria-label="playing ? 'Пауза' : 'Начать чтение'"
-        @click="toggle"
-      >
-        <Icon :name="playing ? 'pause' : 'play'" :size="20" /></button
-      ><button
-        class="icon-button"
-        aria-label="Вперёд на 10 слов"
-        @click="seek(index + 10)"
-      >
-        <Icon name="right" /></button
-      ><input
-        v-model.number="speed"
-        class="speed-slider"
-        type="range"
-        min="60"
-        max="1200"
-        step="5"
-        aria-label="Скорость чтения"
-      /><span>{{ speed }} слов/мин</span>
-    </div>
-    <div class="reader-progress-row">
-      <span>{{ percent }}%</span
-      ><input
-        type="range"
-        :value="index"
-        min="0"
-        :max="Math.max(0, tokens.length - 1)"
-        aria-label="Позиция в тексте"
-        @input="seek(Number(($event.target as HTMLInputElement).value))"
-      /><span
-        >{{ Math.min(index + 1, tokens.length).toLocaleString("ru") }} /
-        {{ tokens.length.toLocaleString("ru") }}</span
-      >
-    </div>
-    <small class="muted" style="font-size: 10px"
-      >Позиция хранится в этом браузере ·
-      {{
-        speedMode
-          ? "Пробел — старт/пауза, стрелки — позиция и скорость"
-          : "Нажмите на слово, чтобы продолжить с него"
-      }}</small
-    >
+      <BookText
+        :key="chapterMode ? activeChapter.start : 'full'"
+        ref="textBox"
+        :tokens="contextTokens"
+        :index="index"
+        :font-size="fontSize"
+        :search="search"
+        :follow-current="speedMode && playing"
+        @select="seek"
+      />
+    </section>
   </div>
 </template>

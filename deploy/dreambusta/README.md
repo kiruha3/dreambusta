@@ -1,0 +1,48 @@
+# DreamBusta на VPS
+
+Размещено 11 ноября 2026 по явному запросу пользователя на `45.9.12.136`.
+
+- Библиотека: https://dreambusta.45-9-12-136.sslip.io/library
+- Вход редактора: https://dreambusta.45-9-12-136.sslip.io/login
+- Используется существующая учётка локальной DreamBusta `admin@dreambusta.local`, пароль сохранён. Локальные сессии не переносились.
+- При первом размещении перенесена согласованная копия SQLite и 81 связанный файл для 6 материалов. Локальная библиотека осталась на месте. Дальнейшие изменения локальной и серверной библиотек независимы.
+
+## Изоляция от WBook
+
+Существующие WBook, `/opt/wbook`, `/var/lib/wbook`, его systemd unit и Nginx vhost не изменялись. Глобальная установка Node 22 не менялась. Nginx перечитан штатно, WBook не перезапускался.
+
+| Назначение | Путь |
+|---|---|
+| Релизы | `/opt/dreambusta/releases/<release>` |
+| Текущая версия | `/opt/dreambusta/current` — symlink |
+| Независимый Node 24 | `/opt/dreambusta/node` — symlink в `runtime/` |
+| Библиотека | `/var/lib/dreambusta` |
+| Сервис | `/etc/systemd/system/dreambusta.service` |
+| Nginx | `/etc/nginx/sites-available/dreambusta` |
+| Сертификат | `/etc/letsencrypt/live/dreambusta/` |
+| ACME webroot | `/var/www/dreambusta-acme` |
+
+API слушает только `127.0.0.1:5276`; снаружи доступен через HTTPS Nginx. Сервис работает отдельным системным пользователем `dreambusta`, пишет только в своё хранилище и временный каталог. Автозапуск включён. Frontend выдаётся из готовой `dist/`, без Vite dev server.
+
+Для `/assets/*.mjs` задан `Content-Type: application/javascript`: без него старый системный `mime.types` отдавал PDF worker как `application/octet-stream`, а браузер блокировал модуль при `nosniff`. Исправление применено 11 ноября 2026 только к vhost DreamBusta; приложение и данные не заменялись. Если открытая вкладка сохранила старый ответ, обновите её через Ctrl+F5.
+
+Сертификат Let's Encrypt обновляется существующим Certbot timer. Уже установленный глобальный deploy hook проверяет и перечитывает Nginx после обновления сертификатов.
+
+## Обновление исходников
+
+1. Локально выполнить проверки и собрать `dist/`.
+2. Поместить новую версию в **новую** папку `releases/`. Включить `dist/`, `server/`, `shared/`, `lib/`, `vendor/`, `package.json` и `package-lock.json`. Не включать `.git/`, `.env`, `data/` и локальные сессии.
+3. В новой папке установить зависимости через независимый Node: добавить `/opt/dreambusta/node/bin` в `PATH`, выполнить `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`.
+4. Переключить только `/opt/dreambusta/current` на новую версию и перезапустить только `dreambusta.service`. Для отката вернуть предыдущий symlink и перезапустить тот же сервис. Данные при обновлении исходников не заменять.
+5. Проверить HTTPS `/library`, `/api/session`, карточку и файл материала, а также доступность WBook. При изменении только исходников перечитывать Nginx не требуется.
+
+Состояние и журнал:
+
+```sh
+systemctl status dreambusta
+journalctl -u dreambusta -n 100 --no-pager
+```
+
+Резервная копия данных: остановить **только** DreamBusta, сохранить весь `/var/lib/dreambusta` вместе с SQLite/WAL и файлами, затем запустить DreamBusta. Не заменять библиотеку первичной локальной копией при обычных обновлениях.
+
+Перед первым размещением конфигурация существующего сервера сохранена в `/root/dreambusta-deploy-20261111T055900Z/existing-config.tgz`; контрольные суммы — `before.sha256`. Первичные архивы релиза и библиотеки хранятся там же с доступом только root. Пароли сервера в репозитории отсутствуют.
