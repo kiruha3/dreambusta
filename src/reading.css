@@ -98,6 +98,49 @@
     );
   column-gap: 0;
 }
+.reading-page .material-workspace.with-side-panel {
+  grid-template-columns: minmax(0, 1fr) 16px var(
+      --publication-tree-width,
+      240px
+    );
+  column-gap: 0;
+}
+.reading-side-panel {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reading-side-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.reading-side-actions .button {
+  font-size: 11px;
+  padding: 8px 6px;
+  gap: 4px;
+  min-width: 0;
+}
+.reading-side-actions .button:only-child {
+  grid-column: 1 / -1;
+}
+.reading-side-actions [aria-expanded="true"] {
+  background: var(--muted);
+  border-color: var(--ring);
+}
+.reading-side-panel .publication-sidebar {
+  position: static;
+  max-height: 60vh;
+  width: 100%;
+  align-self: stretch;
+}
+.reading-side-panel .material-info {
+  display: flex;
+  min-width: 0;
+}
 .reading-page .material-workspace > .viewer-panel {
   grid-column: 1;
   grid-row: 1;
@@ -346,7 +389,12 @@
   grid-template-columns: minmax(0, 1fr) !important;
 }
 .reading-page.panels-hidden
-  :is(.publication-sidebar, .material-info, .publication-splitter) {
+  :is(
+    .reading-side-panel,
+    .publication-sidebar,
+    .material-info,
+    .publication-splitter
+  ) {
   display: none;
 }
 .reading-page.panels-hidden .material-workspace > .viewer-panel {
@@ -368,7 +416,8 @@
   .reading-page .material-workspace.with-material-info {
     grid-template-columns: minmax(0, 1fr);
   }
-  .reading-page .material-workspace.with-publication-tree {
+  .reading-page .material-workspace.with-publication-tree,
+  .reading-page .material-workspace.with-side-panel {
     grid-template-columns: minmax(0, 1fr) 16px var(
         --publication-tree-width,
         240px
@@ -386,22 +435,32 @@
   .article-reading-position {
     top: 61px;
   }
-  .reading-page .material-workspace.with-publication-tree {
+  .reading-page .material-workspace.with-publication-tree,
+  .reading-page .material-workspace.with-side-panel {
     grid-template-columns: minmax(0, 1fr);
   }
-  .reading-page .material-workspace > .publication-sidebar {
+  .reading-side-panel {
+    display: contents;
+  }
+  .reading-side-actions {
     grid-column: 1;
     grid-row: 1;
+    justify-self: end;
+    width: min(100%, 280px);
+  }
+  .reading-side-panel > .publication-sidebar {
+    grid-column: 1;
+    grid-row: 2;
     position: static;
     max-height: 45vh;
     overflow: auto;
   }
-  .reading-page .material-workspace.with-publication-tree > .viewer-panel {
-    grid-row: 2;
-  }
-  .reading-page .material-workspace > .material-info,
-  .reading-page .material-workspace.with-publication-tree > .material-info {
+  .reading-page .material-workspace.with-side-panel > .viewer-panel {
     grid-row: 3;
+  }
+  .reading-side-panel > .material-info {
+    grid-column: 1;
+    grid-row: 4;
   }
   .reading-page .publication-sidebar nav {
     max-height: none;

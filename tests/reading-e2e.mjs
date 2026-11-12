@@ -132,6 +132,34 @@ try {
   );
   const readingBox = await page.locator(".viewer-panel").boundingBox();
   const menuBox = await page.locator(".publication-sidebar").boundingBox();
+  const sideButtons = page.getByRole("group", {
+    name: "Боковые панели",
+    exact: true,
+  });
+  const sideButtonsBox = await sideButtons.boundingBox();
+  assert.ok(
+    sideButtonsBox.x >= readingBox.x + readingBox.width,
+    "contents and material buttons live in the right pane",
+  );
+  assert.equal(
+    await page
+      .locator(
+        '.reading-controls button[aria-controls="publication-tree"], .reading-controls button[aria-controls="material-info"]',
+      )
+      .count(),
+    0,
+    "individual panel buttons are absent from the upper toolbar",
+  );
+  assert.ok(
+    await sideButtons.evaluate((el) =>
+      [...el.querySelectorAll("button")].every((button) => {
+        const box = button.getBoundingClientRect();
+        const parent = el.getBoundingClientRect();
+        return box.left >= parent.left && box.right <= parent.right + 1;
+      }),
+    ),
+    "side buttons fit their pane",
+  );
   assert.ok(
     menuBox.x >= readingBox.x + readingBox.width,
     "publication pages remain to the right of reading",

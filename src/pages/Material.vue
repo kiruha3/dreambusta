@@ -722,29 +722,6 @@ onBeforeUnmount(() => {
           </select>
         </label>
         <button
-          v-if="navigation.length"
-          class="button small"
-          :aria-label="
-            contentsVisible ? 'Скрыть оглавление' : 'Показать оглавление'
-          "
-          :aria-expanded="contentsVisible"
-          aria-controls="publication-tree"
-          @click="toggleContents"
-        >
-          <Icon name="collections" :size="15" />{{
-            contentsVisible ? "Скрыть оглавление" : "Показать оглавление"
-          }}
-        </button>
-        <button
-          class="button small"
-          aria-label="О материале"
-          :aria-expanded="infoOpen"
-          aria-controls="material-info"
-          @click="infoOpen = !infoOpen"
-        >
-          <Icon name="info" :size="15" />О материале
-        </button>
-        <button
           class="button small"
           :aria-label="
             panelsHidden ? 'Показать боковые панели' : 'Скрыть боковые панели'
@@ -778,20 +755,104 @@ onBeforeUnmount(() => {
         :class="{
           'with-publication-tree': navigation.length && treeOpen,
           'with-material-info': infoOpen,
+          'with-side-panel': !panelsHidden,
         }"
       >
-        <aside v-if="navigation.length && treeOpen" class="publication-sidebar">
-          <nav id="publication-tree" aria-label="Дерево публикации">
-            <h3>Оглавление</h3>
-            <PublicationTree
-              :nodes="navigation"
-              :current-url="
-                currentPage?.sourceUrl || (!pageMissing ? m.source.url : '')
+        <aside
+          v-if="!panelsHidden"
+          class="reading-side-panel"
+          aria-label="Боковая панель чтения"
+        >
+          <div
+            class="reading-side-actions"
+            role="group"
+            aria-label="Боковые панели"
+          >
+            <button
+              v-if="navigation.length"
+              class="button small"
+              :aria-label="
+                contentsVisible ? 'Скрыть оглавление' : 'Показать оглавление'
               "
-              :href-for="navigationPath"
-              :material-id="m.id"
-            />
-          </nav>
+              :aria-expanded="contentsVisible"
+              aria-controls="publication-tree"
+              @click="toggleContents"
+            >
+              <Icon name="collections" :size="15" />Оглавление
+            </button>
+            <button
+              class="button small"
+              aria-label="О материале"
+              :aria-expanded="infoOpen"
+              aria-controls="material-info"
+              @click="infoOpen = !infoOpen"
+            >
+              <Icon name="info" :size="15" />О материале
+            </button>
+          </div>
+          <aside
+            v-if="navigation.length && treeOpen"
+            class="publication-sidebar"
+          >
+            <nav id="publication-tree" aria-label="Дерево публикации">
+              <h3>Оглавление</h3>
+              <PublicationTree
+                :nodes="navigation"
+                :current-url="
+                  currentPage?.sourceUrl || (!pageMissing ? m.source.url : '')
+                "
+                :href-for="navigationPath"
+                :material-id="m.id"
+              />
+            </nav>
+          </aside>
+          <aside v-if="infoOpen" id="material-info" class="material-info">
+            <section class="panel">
+              <h3>О материале</h3>
+              <p class="muted small-text">
+                {{ m.description || "Описание пока не добавлено." }}
+              </p>
+              <div class="meta-pair">
+                <small>Тип</small>{{ kindNames[m.kind] }}
+              </div>
+              <div class="meta-pair">
+                <small>Добавлен</small>{{ date(m.createdAt) }}
+              </div>
+              <div v-if="m.source.provider" class="meta-pair">
+                <small>Источник</small>{{ m.source.provider }}
+              </div>
+              <div v-if="m.tags.length" class="row wrap">
+                <span v-for="tag in m.tags" :key="tag" class="badge">{{
+                  tag
+                }}</span>
+              </div>
+              <a
+                v-if="m.downloadable && m.files.original"
+                class="button full"
+                style="margin-top: 22px"
+                :href="fileUrl(m.id)"
+                download
+                ><Icon name="download" :size="15" />Скачать оригинал</a
+              ><a
+                v-if="m.source.url"
+                class="button full"
+                style="margin-top: 12px"
+                :href="m.source.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                ><Icon name="external" :size="15" />Открыть источник</a
+              >
+            </section>
+            <div v-if="!m.representations.includes('text')" class="notice">
+              <Icon name="info" /><span
+                >Текстовый слой или расшифровка отсутствуют. Доступен просмотр
+                материала.</span
+              >
+            </div>
+            <div v-for="w in m.warnings" :key="w" class="notice compact">
+              {{ w }}
+            </div>
+          </aside>
         </aside>
         <div
           v-if="navigation.length && treeOpen"
@@ -943,53 +1004,6 @@ onBeforeUnmount(() => {
             </p>
           </div>
         </section>
-        <aside v-if="infoOpen" id="material-info" class="material-info">
-          <section class="panel">
-            <h3>О материале</h3>
-            <p class="muted small-text">
-              {{ m.description || "Описание пока не добавлено." }}
-            </p>
-            <div class="meta-pair">
-              <small>Тип</small>{{ kindNames[m.kind] }}
-            </div>
-            <div class="meta-pair">
-              <small>Добавлен</small>{{ date(m.createdAt) }}
-            </div>
-            <div v-if="m.source.provider" class="meta-pair">
-              <small>Источник</small>{{ m.source.provider }}
-            </div>
-            <div v-if="m.tags.length" class="row wrap">
-              <span v-for="tag in m.tags" :key="tag" class="badge">{{
-                tag
-              }}</span>
-            </div>
-            <a
-              v-if="m.downloadable && m.files.original"
-              class="button full"
-              style="margin-top: 22px"
-              :href="fileUrl(m.id)"
-              download
-              ><Icon name="download" :size="15" />Скачать оригинал</a
-            ><a
-              v-if="m.source.url"
-              class="button full"
-              style="margin-top: 12px"
-              :href="m.source.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              ><Icon name="external" :size="15" />Открыть источник</a
-            >
-          </section>
-          <div v-if="!m.representations.includes('text')" class="notice">
-            <Icon name="info" /><span
-              >Текстовый слой или расшифровка отсутствуют. Доступен просмотр
-              материала.</span
-            >
-          </div>
-          <div v-for="w in m.warnings" :key="w" class="notice compact">
-            {{ w }}
-          </div>
-        </aside>
       </div></template
     >
   </div>
