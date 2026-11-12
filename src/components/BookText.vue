@@ -18,6 +18,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [index: number] }>();
 const container = ref<HTMLElement>();
+const column = ref<HTMLElement>();
 const width = ref(600);
 const height = ref(500);
 const top = ref(0);
@@ -190,14 +191,17 @@ onMounted(() => {
   });
   resize = new ResizeObserver(() => {
     if (!container.value) return;
-    if (width.value !== container.value.clientWidth) {
-      width.value = container.value.clientWidth;
+    const columnWidth =
+      column.value?.clientWidth || container.value.clientWidth;
+    if (width.value !== columnWidth) {
+      width.value = columnWidth;
       measured.value = {};
     }
     height.value = container.value.clientHeight;
     fitAvailableHeight();
   });
   if (container.value) resize.observe(container.value);
+  if (column.value) resize.observe(column.value);
   measure();
   fitAvailableHeight();
   window.addEventListener("resize", fitAvailableHeight);
@@ -236,6 +240,8 @@ onBeforeUnmount(() => {
     @scroll="top = ($event.target as HTMLElement).scrollTop"
   >
     <div
+      ref="column"
+      class="virtual-reader-column"
       :style="{
         height: (offsets[offsets.length - 1] || 0) + 30 + 'px',
         position: 'relative',

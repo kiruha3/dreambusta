@@ -425,6 +425,35 @@ try {
   await page.getByRole("button", { name: "Моё место", exact: true }).click();
   await page.locator('.selected-word[data-token-index="1400"]').waitFor();
   const textViewport = page.locator(".virtual-reader");
+  const textFillsPanel = () =>
+    textViewport.evaluate((el) => {
+      const viewport = el.getBoundingClientRect();
+      const panel = el.closest(".viewer-panel").getBoundingClientRect();
+      return (
+        Math.abs(viewport.left - panel.left - 1) < 2 &&
+        Math.abs(panel.right - viewport.right - 1) < 2
+      );
+    });
+  assert.ok(
+    await textFillsPanel(),
+    "Text scrollbar spans the panel independently of the text column",
+  );
+  const wideTextColumn = await page
+    .locator(".virtual-reader-column")
+    .evaluate((el) => el.clientWidth);
+  await page
+    .getByLabel("Ширина текста", { exact: true })
+    .selectOption("narrow");
+  await page.waitForFunction(
+    (wide) =>
+      document.querySelector(".virtual-reader-column").clientWidth < wide,
+    wideTextColumn,
+  );
+  assert.ok(
+    await textFillsPanel(),
+    "narrowing Text leaves its scrollbar at the panel edge",
+  );
+  await page.getByLabel("Ширина текста", { exact: true }).selectOption("wide");
   await textViewport.scrollIntoViewIfNeeded();
   await textViewport.evaluate((el) => {
     el.scrollTop = 0;
@@ -463,6 +492,24 @@ try {
   });
   await page.screenshot({ path: ".superpowers/reading/text-desktop.png" });
   await page.getByRole("button", { name: "WBook", exact: true }).click();
+  assert.ok(
+    await textFillsPanel(),
+    "WBook full text also uses the whole panel for scrolling",
+  );
+  const wbookPanel = await page.locator(".viewer-panel").boundingBox();
+  for (const selector of [
+    ".chapter-controls",
+    ".focus-stage",
+    ".reader-controls",
+    ".reader-full-text",
+  ]) {
+    const box = await page.locator(selector).boundingBox();
+    assert.ok(
+      Math.abs(box.x - wbookPanel.x - 1) < 2 &&
+        Math.abs(box.width - wbookPanel.width + 2) < 2,
+      `${selector} shares the full WBook panel width`,
+    );
+  }
   const controlsBox = await page.locator(".reader-controls").boundingBox();
   const fullTextBox = await page.locator(".reader-full-text").boundingBox();
   assert.ok(
