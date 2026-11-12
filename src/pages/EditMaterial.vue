@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import type { Material } from "../../shared/types";
 import { api, send, notify, date, fileUrl, uploadFile } from "../api";
 import Icon from "../components/Icon.vue";
+import { isKnowledge } from "../../shared/knowledge";
 const route = useRoute();
 const router = useRouter();
 const m = ref<Material>();
@@ -35,6 +36,7 @@ async function saveTranscript() {
 api<Material>(`/materials/${route.params.id}`)
   .then((x) => {
     m.value = x;
+    m.value.knowledge = isKnowledge(x);
     tags.value = x.tags.join(", ");
   })
   .catch((e) => (error.value = e.message));
@@ -50,6 +52,7 @@ async function save() {
       slug: m.value.slug,
       visible: m.value.visible,
       downloadable: m.value.downloadable,
+      knowledge: m.value.knowledge,
       tags: tags.value
         .split(",")
         .map((x) => x.trim())
@@ -337,6 +340,9 @@ async function copy() {
           <label class="check-label"
             ><input v-model="m.visible" type="checkbox" />Показывать в
             библиотеке</label
+          ><label class="check-label"
+            ><input v-model="m.knowledge" type="checkbox" />Включить в базу
+            знаний</label
           ><label class="check-label"
             ><input v-model="m.downloadable" type="checkbox" />Показывать
             скачивание оригинала</label

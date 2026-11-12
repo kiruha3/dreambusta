@@ -1,11 +1,27 @@
-import { reactive } from "vue";
-import type { Session } from "../shared/types.ts";
+import { reactive, ref } from "vue";
+import type { Session, Material } from "../shared/types.ts";
 export const session = reactive<Session>({
   setupRequired: false,
   editor: false,
   closed: false,
 });
 export const ui = reactive({ notice: "", error: "" });
+export const sidebarMaterials = ref<
+  Pick<Material, "id" | "slug" | "title" | "kind">[]
+>([]);
+let navigationGeneration = 0;
+export async function loadNavigation() {
+  const generation = ++navigationGeneration;
+  try {
+    const response = await api<{ materials: typeof sidebarMaterials.value }>(
+      "/navigation",
+    );
+    if (generation === navigationGeneration)
+      sidebarMaterials.value = response.materials;
+  } catch {
+    if (generation === navigationGeneration) sidebarMaterials.value = [];
+  }
+}
 let notification: ReturnType<typeof setTimeout>;
 export function notify(message: string) {
   ui.notice = message;
@@ -26,14 +42,12 @@ export async function api<T = any>(
       ...init.headers,
     },
   });
-  const data = await response
-    .json()
-    .catch(() => ({
-      error:
-        response.status === 413
-          ? "Файл превышает лимит загрузки сервера"
-          : "Сервер вернул некорректный ответ",
-    }));
+  const data = await response.json().catch(() => ({
+    error:
+      response.status === 413
+        ? "Файл превышает лимит загрузки сервера"
+        : "Сервер вернул некорректный ответ",
+  }));
   if (!response.ok)
     throw Object.assign(new Error(data.error || "Ошибка запроса"), {
       status: response.status,

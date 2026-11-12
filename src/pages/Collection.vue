@@ -47,7 +47,7 @@ const error = ref("");
       >
     </div>
     <div class="cards">
-      <MaterialCard v-for="m in items" :key="m.id" :material="m" />
+      <MaterialCard v-for="m in items" :key="m.id" :material="m" :context="{from: 'collection', collection: c.slug}" />
     </div>
     <div v-if="!items.length" class="empty panel">
       В этой подборке пока нет доступных материалов.

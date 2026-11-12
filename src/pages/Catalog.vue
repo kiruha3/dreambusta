@@ -13,7 +13,15 @@ const kind = ref("all");
 const order = ref("new");
 const error = ref("");
 const loading = ref(true);
-api<Material[]>("/materials")
+const knowledge = computed(() => route.path === "/knowledge");
+const cardContext = computed(() =>
+  knowledge.value
+    ? { from: "knowledge" }
+    : route.query.view === "favorites" || route.query.view === "continue"
+      ? { from: route.query.view }
+      : {},
+);
+api<Material[]>(knowledge.value ? "/materials?section=knowledge" : "/materials")
   .then((x) => (items.value = x))
   .catch((e) => (error.value = e.message))
   .finally(() => (loading.value = false));
@@ -22,7 +30,9 @@ const title = computed(() =>
     ? "Избранное"
     : route.query.view === "continue"
       ? "Продолжить чтение"
-      : "Библиотека знаний",
+      : knowledge.value
+        ? "База знаний"
+        : "Все материалы",
 );
 const favorites = () => {
   try {
@@ -62,9 +72,7 @@ watch(
 <template>
   <div class="page-heading">
     <div>
-      <div class="eyebrow">ЧИТАТЬ. СМОТРЕТЬ. УЗНАВАТЬ.</div>
       <h1>{{ title }}</h1>
-      <p>Книги, документы, видео и подкасты — всё в одном месте.</p>
     </div>
     <RouterLink v-if="session.editor" to="/admin/add" class="button primary"
       ><Icon name="plus" />Добавить материал</RouterLink
@@ -103,7 +111,12 @@ watch(
       ><span class="muted small-text">Доступно для чтения и просмотра</span>
     </div>
     <div class="cards">
-      <MaterialCard v-for="m in filtered" :key="m.id" :material="m" /></div
+      <MaterialCard
+        v-for="m in filtered"
+        :key="m.id"
+        :material="m"
+        :context="cardContext"
+      /></div
   ></template>
   <div v-else class="empty panel">
     <span class="empty-icon"><Icon name="library" :size="33" /></span>
@@ -118,7 +131,9 @@ watch(
       {{
         query || kind !== "all"
           ? "Попробуйте другой запрос или тип материала."
-          : "Добавьте первый документ, книгу или ссылку. Материал получит постоянный адрес и будет доступен из ваших приложений."
+          : knowledge
+            ? "Добавьте статью или включите материал в базу знаний через его настройки."
+            : "Добавьте документ, книгу или ссылку."
       }}
     </p>
     <RouterLink v-if="session.editor" class="button primary" to="/admin/add"

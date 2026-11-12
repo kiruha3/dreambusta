@@ -14,16 +14,26 @@ const props = defineProps<{
   fontSize: number;
   search: string;
   followCurrent?: boolean;
+  fitViewport?: boolean;
 }>();
 const emit = defineEmits<{ select: [index: number] }>();
 const container = ref<HTMLElement>();
 const width = ref(600);
 const height = ref(500);
 const top = ref(0);
+const viewportHeight = ref(500);
 const measured = ref<Record<number, number>>({});
 let resize: ResizeObserver;
 let rowsResize: ResizeObserver;
 let followGeneration = 0;
+function fitAvailableHeight() {
+  if (!props.fitViewport || !container.value) return;
+  const remaining =
+    window.innerHeight -
+    Math.max(0, container.value.getBoundingClientRect().top) -
+    20;
+  viewportHeight.value = Math.max(200, Math.min(760, Math.floor(remaining)));
+}
 const rows = computed(() => {
   const list: { words: Token[]; paragraph: number; start: number }[] = [];
   for (const token of props.tokens) {
@@ -52,8 +62,8 @@ const offsets = computed(() => {
             r.words.reduce((n, w) => n + w.text.length + 1, 0) / charsPerLine,
           ) *
             props.fontSize *
-            1.9 +
-            props.fontSize),
+            1.6 +
+            props.fontSize * 0.35),
     ),
   );
   return out;
@@ -185,15 +195,21 @@ onMounted(() => {
       measured.value = {};
     }
     height.value = container.value.clientHeight;
+    fitAvailableHeight();
   });
   if (container.value) resize.observe(container.value);
   measure();
+  fitAvailableHeight();
+  window.addEventListener("resize", fitAvailableHeight);
+  window.addEventListener("scroll", fitAvailableHeight, { passive: true });
   void nextTick(follow);
 });
 onBeforeUnmount(() => {
   followGeneration++;
   resize?.disconnect();
   rowsResize?.disconnect();
+  window.removeEventListener("resize", fitAvailableHeight);
+  window.removeEventListener("scroll", fitAvailableHeight);
 });
 </script>
 <template>
@@ -210,7 +226,11 @@ onBeforeUnmount(() => {
   <div
     ref="container"
     class="virtual-reader reader-text"
-    :style="{ fontSize: fontSize + 'px' }"
+    :class="{ 'viewport-fit-reader': fitViewport }"
+    :style="{
+      fontSize: fontSize + 'px',
+      height: fitViewport ? viewportHeight + 'px' : undefined,
+    }"
     tabindex="0"
     aria-label="Полный текст; нажмите на слово, чтобы выбрать позицию"
     @scroll="top = ($event.target as HTMLElement).scrollTop"

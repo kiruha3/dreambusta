@@ -2,10 +2,18 @@
 import type { Material } from "../../shared/types";
 import Icon from "./Icon.vue";
 import { kindNames, fileUrl } from "../api";
-defineProps<{ material: Material; number?: number }>();
+import { withContext } from "../lib/navigation";
+defineProps<{
+  material: Material;
+  number?: number;
+  context?: Record<string, unknown>;
+}>();
 </script>
 <template>
-  <RouterLink class="material-card" :to="`/library/${material.slug}`">
+  <RouterLink
+    class="material-card"
+    :to="withContext(`/library/${material.slug}`, context || {})"
+  >
     <div class="card-art" :class="`art-${material.kind}`">
       <img
         v-if="material.cover"

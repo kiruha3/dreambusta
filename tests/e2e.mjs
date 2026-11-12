@@ -26,7 +26,7 @@ const { chromium } = (() => {
 const dir = mkdtempSync(join(tmpdir(), "dreambusta-e2e-"));
 const env = {
   ...process.env,
-  DREAMBUSTA_AI: 'off',
+  DREAMBUSTA_AI: "off",
   DATA_DIR: dir,
   API_PORT: "5186",
   WEB_PORT: "5185",
@@ -311,14 +311,22 @@ try {
   const inlineIcons = page.locator(".reading-article .publication-link-icon");
   assert.equal(await inlineIcons.count(), 2);
   await page.waitForFunction(() => {
-    const img = document.querySelector(".reading-article img.publication-link-icon");
+    const img = document.querySelector(
+      ".reading-article img.publication-link-icon",
+    );
     return img?.complete && img.naturalWidth > 0;
   });
   for (const icon of await inlineIcons.all()) {
     const box = await icon.boundingBox();
-    assert.ok(box.width > 10 && box.width < 32 && box.height < 32, "article icons stay inline and compact");
+    assert.ok(
+      box.width > 10 && box.width < 32 && box.height < 32,
+      "article icons stay inline and compact",
+    );
   }
-  assert.match(await page.locator('.reading-article a').first().getAttribute('href'), /^\/library\/.+\?page=baza-znaniy$/);
+  assert.match(
+    await page.locator(".reading-article a").first().getAttribute("href"),
+    /^\/library\/.+\?page=baza-znaniy$/,
+  );
   const articleBox = await page.locator(".viewer-panel").boundingBox();
   const publicationMenuBox = await page
     .locator(".publication-sidebar")
@@ -382,17 +390,26 @@ try {
     .waitFor();
   assert.equal(
     await page
-      .getByRole("button", { name: "Страницы публикации", exact: true })
+      .getByRole("button", {
+        name: /(?:Скрыть|Показать) оглавление/,
+        exact: true,
+      })
       .getAttribute("aria-expanded"),
     "false",
     "mobile tree starts collapsed",
   );
   await page
-    .getByRole("button", { name: "Страницы публикации", exact: true })
+    .getByRole("button", {
+      name: /(?:Скрыть|Показать) оглавление/,
+      exact: true,
+    })
     .click();
   assert.equal(
     await page
-      .getByRole("button", { name: "Страницы публикации", exact: true })
+      .getByRole("button", {
+        name: /(?:Скрыть|Показать) оглавление/,
+        exact: true,
+      })
       .getAttribute("aria-expanded"),
     "true",
   );
@@ -402,7 +419,10 @@ try {
     animations: "disabled",
   });
   await page
-    .getByRole("button", { name: "Страницы публикации", exact: true })
+    .getByRole("button", {
+      name: /(?:Скрыть|Показать) оглавление/,
+      exact: true,
+    })
     .click();
   await page.screenshot({
     path: artifacts + "/publication-tree-mobile-collapsed.png",
@@ -486,26 +506,38 @@ try {
     () => document.querySelector(".pdf-canvas-stage canvas")?.width > 100,
   );
   assert.equal(
-    await page.locator('.app-shell > .sidebar').evaluate(el => getComputedStyle(el).position),
-    'fixed',
-    'PDF styles must not override the library navigation',
+    await page
+      .locator(".app-shell > .sidebar")
+      .evaluate((el) => getComputedStyle(el).position),
+    "fixed",
+    "PDF styles must not override the library navigation",
   );
   assert.equal(
-    await page
-      .getByRole("button", { name: "WBook", exact: true })
-      .count(),
+    await page.getByRole("button", { name: "WBook", exact: true }).count(),
     0,
   );
   await page.screenshot({ path: artifacts + "/scan-pdf.png", fullPage: true });
   const jpx = await upload("JPX scan.pdf", makeJpxPdf());
   await page.goto(base + "/library/" + jpx.slug);
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('.pdf-canvas-stage canvas');
-    if (!canvas || canvas.width < 100) return false;
-    const pixels = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
-    let colored=0; for(let i=0;i<pixels.length;i+=4) if(pixels[i+1]>pixels[i]+30 && pixels[i+1]>pixels[i+2]+20) colored++;
-    return colored>100;
-  },undefined,{timeout:5000});
+  await page.waitForFunction(
+    () => {
+      const canvas = document.querySelector(".pdf-canvas-stage canvas");
+      if (!canvas || canvas.width < 100) return false;
+      const pixels = canvas
+        .getContext("2d")
+        .getImageData(0, 0, canvas.width, canvas.height).data;
+      let colored = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (
+          pixels[i + 1] > pixels[i] + 30 &&
+          pixels[i + 1] > pixels[i + 2] + 20
+        )
+          colored++;
+      return colored > 100;
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   const paged = await upload(
     "Многостраничный.pdf",
     makePdf("Readable text in the document.", 3),
@@ -515,23 +547,62 @@ try {
   await page.waitForFunction(
     () => document.querySelector('[aria-label="Номер страницы"]')?.max === "3",
   );
-  assert.equal(await page.locator('.pdf-canvas-stage .page').count(),3,'PDF pages must form a continuous scroll');
-  await page.locator('.pdf-canvas-stage .textLayer').first().getByText('Readable text in the document.',{exact:true}).waitFor();
-  assert.equal(await page.getByRole('complementary',{name:'Страницы PDF',exact:true}).count(),0,'PDF page list starts closed');
-  await page.getByRole('button',{name:'Страницы PDF',exact:true}).click();
-  assert.equal(await page.locator('.pdf-page-list canvas').count(),0,'page navigation is a compact list');
-  await page.getByRole('button',{name:'Миниатюры',exact:true}).click();
-  await page.locator('.pdf-thumbnail').first().waitFor();
-  await page.waitForFunction(()=>document.querySelector('.pdf-thumbnail')?.width===96);
-  await page.getByRole('button',{name:'Список',exact:true}).click();
-  assert.equal(await page.locator('.pdf-thumbnail').count(),0);
-  await page.getByRole('button',{name:'Перейти к странице 2',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('[aria-label="Номер страницы"]')?.value==='2');
-  await page.getByRole('button',{name:'Страницы PDF',exact:true}).click();
-  assert.equal(await page.getByRole('complementary',{name:'Страницы PDF',exact:true}).count(),0);
-  assert.equal(await page.getByLabel('Номер страницы',{exact:true}).inputValue(),'2','closing the list retains current page');
-  await page.locator('.pdf-canvas-stage').evaluate(el=>{el.scrollTop=0;});
-  await page.waitForFunction(()=>document.querySelector('[aria-label="Номер страницы"]')?.value==='1');
+  assert.equal(
+    await page.locator(".pdf-canvas-stage .page").count(),
+    3,
+    "PDF pages must form a continuous scroll",
+  );
+  await page
+    .locator(".pdf-canvas-stage .textLayer")
+    .first()
+    .getByText("Readable text in the document.", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("complementary", { name: "Страницы PDF", exact: true })
+      .count(),
+    0,
+    "PDF page list starts closed",
+  );
+  await page.getByRole("button", { name: "Страницы PDF", exact: true }).click();
+  assert.equal(
+    await page.locator(".pdf-page-list canvas").count(),
+    0,
+    "page navigation is a compact list",
+  );
+  await page.getByRole("button", { name: "Миниатюры", exact: true }).click();
+  await page.locator(".pdf-thumbnail").first().waitFor();
+  await page.waitForFunction(
+    () => document.querySelector(".pdf-thumbnail")?.width === 96,
+  );
+  await page.getByRole("button", { name: "Список", exact: true }).click();
+  assert.equal(await page.locator(".pdf-thumbnail").count(), 0);
+  await page
+    .getByRole("button", { name: "Перейти к странице 2", exact: true })
+    .click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[aria-label="Номер страницы"]')?.value === "2",
+  );
+  await page.getByRole("button", { name: "Страницы PDF", exact: true }).click();
+  assert.equal(
+    await page
+      .getByRole("complementary", { name: "Страницы PDF", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page.getByLabel("Номер страницы", { exact: true }).inputValue(),
+    "2",
+    "closing the list retains current page",
+  );
+  await page.locator(".pdf-canvas-stage").evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[aria-label="Номер страницы"]')?.value === "1",
+  );
   await page.getByLabel("Номер страницы", { exact: true }).fill("3");
   await page.getByLabel("Номер страницы", { exact: true }).press("Enter");
   await page.getByRole("button", { name: "Текст", exact: true }).click();
@@ -647,23 +718,52 @@ try {
   assert.equal(typography[1].fontWeight, "700");
   assert.match(typography[0].fontFamily, /Arial, sans-serif$/);
   assert.equal(await page.locator(".slides-stage rect[rx]").count(), 1);
-  const vectorDeck = await upload("Векторная презентация.pptx", await makeVectorPptx());
+  const vectorDeck = await upload(
+    "Векторная презентация.pptx",
+    await makeVectorPptx(),
+  );
   await page.goto(base + "/library/" + vectorDeck.slug);
   await page.getByRole("button", { name: "Слайды", exact: true }).click();
   await page.locator(".slides-stage").getByText("Первый слайд").waitFor();
-  assert.equal(await page.locator(".slides-stage path[d]").count(), 2, "vector icons must draw their paths");
-  assert.equal(await page.locator(".slides-stage radialGradient stop").count(), 2);
-  assert.match(await page.locator(".slides-stage ellipse").getAttribute("fill"), /^url\(#/);
-  const tableDeck = await upload("Таблица в презентации.pptx", await makeTablePptx());
+  assert.equal(
+    await page.locator(".slides-stage path[d]").count(),
+    2,
+    "vector icons must draw their paths",
+  );
+  assert.equal(
+    await page.locator(".slides-stage radialGradient stop").count(),
+    2,
+  );
+  assert.match(
+    await page.locator(".slides-stage ellipse").getAttribute("fill"),
+    /^url\(#/,
+  );
+  const tableDeck = await upload(
+    "Таблица в презентации.pptx",
+    await makeTablePptx(),
+  );
   await page.goto(base + "/library/" + tableDeck.slug);
   await page.getByRole("button", { name: "Слайды", exact: true }).click();
   await page.locator(".slides-stage").getByText("Первый слайд").waitFor();
-  assert.equal(await page.locator(".slides-stage table").count(), 1, "native PPTX tables must render cells");
+  assert.equal(
+    await page.locator(".slides-stage table").count(),
+    1,
+    "native PPTX tables must render cells",
+  );
   const tableCells = page.locator(".slides-stage table td");
   assert.equal(await tableCells.count(), 7);
-  assert.equal(await tableCells.filter({ hasText: "Реквизиты" }).getAttribute("colspan"), "2");
-  assert.equal(await tableCells.filter({ hasText: "Заказчик" }).getAttribute("rowspan"), "2");
-  await page.locator(".slides-stage table").getByText("Контракт", { exact: true }).waitFor();
+  assert.equal(
+    await tableCells.filter({ hasText: "Реквизиты" }).getAttribute("colspan"),
+    "2",
+  );
+  assert.equal(
+    await tableCells.filter({ hasText: "Заказчик" }).getAttribute("rowspan"),
+    "2",
+  );
+  await page
+    .locator(".slides-stage table")
+    .getByText("Контракт", { exact: true })
+    .waitFor();
   await page.getByRole("button", { name: "Текст", exact: true }).click();
   await page.getByText("Контракт", { exact: true }).waitFor();
   const deck = await upload("Большая презентация.pptx", await makeDensePptx());
@@ -731,58 +831,155 @@ try {
     .getByText("Плотный слайд 20", { exact: true })
     .waitFor();
   await page.setViewportSize({ width: 1440, height: 1040 });
-  const chapterBook = await upload('Главы.txt',Buffer.from(['Вступительный текст.','Глава 1. Рассвет','Первая история светлая.','Глава 2. Полдень','Вторая история жаркая.','Глава 3. Закат','Последняя история.'].join('\n\n')));
-  await page.goto(base+'/library/'+chapterBook.slug);
-  await page.getByRole('button',{name:'WBook',exact:true}).click();
-  await page.getByLabel('Читать по главам',{exact:true}).check();
-  await page.getByRole('button',{name:'Оглавление',exact:true}).click();
-  await page.getByLabel('Поиск глав',{exact:true}).fill('Полдень');
-  await page.getByRole('button',{name:'Глава 2. Полдень',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('.reader-controls').dataset.index==='8');
-  assert.match(await page.locator('.reader-text').innerText(),/Вторая история/);
-  assert.doesNotMatch(await page.locator('.reader-text').innerText(),/Первая история|Последняя история/);
-  await page.getByLabel('Читать по главам',{exact:true}).uncheck();
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),'8');
-  assert.match(await page.locator('.reader-text').innerText(),/Первая история/);
-  await page.getByRole('button',{name:'Текст',exact:true}).click();
-  assert.equal(await page.getByLabel('Читать по главам',{exact:true}).count(),0);
-  await page.getByRole('button',{name:'WBook',exact:true}).click();
-  await page.getByLabel('Читать по главам',{exact:true}).check();
-  await page.getByRole('button',{name:'Следующая глава',exact:true}).click();
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),'14');
-  await page.getByRole('button',{name:'Предыдущая глава',exact:true}).click();
-  await page.getByLabel('Позиция в тексте',{exact:true}).fill('13');
-  await page.getByRole('button',{name:'Начать чтение',exact:true}).click();
-  await page.getByRole('button',{name:'Начать чтение',exact:true}).waitFor();
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),'13','playback stops at the chapter end');
-  await page.getByRole('button',{name:'Настроить главы',exact:true}).click();
-  await page.getByLabel('По началу заголовка',{exact:true}).check();
-  await page.getByLabel('Начало заголовка',{exact:true}).fill('Не существует');
-  await page.getByRole('button',{name:'Найти главы',exact:true}).click();
-  assert.equal(await page.getByRole('button',{name:'Применить разбивку',exact:true}).isDisabled(),true);
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),'13');
-  await page.getByLabel('Начало заголовка',{exact:true}).fill('Глава 2.');
-  await page.getByRole('button',{name:'Найти главы',exact:true}).click();
-  await page.getByRole('button',{name:'Применить разбивку',exact:true}).click();
+  const chapterBook = await upload(
+    "Главы.txt",
+    Buffer.from(
+      [
+        "Вступительный текст.",
+        "Глава 1. Рассвет",
+        "Первая история светлая.",
+        "Глава 2. Полдень",
+        "Вторая история жаркая.",
+        "Глава 3. Закат",
+        "Последняя история.",
+      ].join("\n\n"),
+    ),
+  );
+  await page.goto(base + "/library/" + chapterBook.slug);
+  await page.getByRole("button", { name: "WBook", exact: true }).click();
+  await page.getByLabel("Читать по главам", { exact: true }).check();
+  await page.getByRole("button", { name: "Оглавление", exact: true }).click();
+  await page.getByLabel("Поиск глав", { exact: true }).fill("Полдень");
+  await page
+    .getByRole("button", { name: "Глава 2. Полдень", exact: true })
+    .click();
+  await page.waitForFunction(
+    () => document.querySelector(".reader-controls").dataset.index === "8",
+  );
+  assert.match(
+    await page.locator(".reader-text").innerText(),
+    /Вторая история/,
+  );
+  assert.doesNotMatch(
+    await page.locator(".reader-text").innerText(),
+    /Первая история|Последняя история/,
+  );
+  await page.getByLabel("Читать по главам", { exact: true }).uncheck();
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    "8",
+  );
+  assert.match(
+    await page.locator(".reader-text").innerText(),
+    /Первая история/,
+  );
+  await page.getByRole("button", { name: "Текст", exact: true }).click();
+  assert.equal(
+    await page.getByLabel("Читать по главам", { exact: true }).count(),
+    0,
+  );
+  await page.getByRole("button", { name: "WBook", exact: true }).click();
+  await page.getByLabel("Читать по главам", { exact: true }).check();
+  await page
+    .getByRole("button", { name: "Следующая глава", exact: true })
+    .click();
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    "14",
+  );
+  await page
+    .getByRole("button", { name: "Предыдущая глава", exact: true })
+    .click();
+  await page.getByLabel("Позиция в тексте", { exact: true }).fill("13");
+  await page
+    .getByRole("button", { name: "Начать чтение", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Начать чтение", exact: true })
+    .waitFor();
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    "13",
+    "playback stops at the chapter end",
+  );
+  await page
+    .getByRole("button", { name: "Настроить главы", exact: true })
+    .click();
+  await page.getByLabel("По началу заголовка", { exact: true }).check();
+  await page
+    .getByLabel("Начало заголовка", { exact: true })
+    .fill("Не существует");
+  await page.getByRole("button", { name: "Найти главы", exact: true }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Применить разбивку", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    "13",
+  );
+  await page.getByLabel("Начало заголовка", { exact: true }).fill("Глава 2.");
+  await page.getByRole("button", { name: "Найти главы", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Применить разбивку", exact: true })
+    .click();
   await page.reload();
-  await page.getByLabel('Читать по главам',{exact:true}).waitFor();
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),'13','chapter settings preserve global progress on reload');
-  await page.getByRole('button',{name:'Настроить главы',exact:true}).click();
-  assert.equal(await page.getByLabel('Начало заголовка',{exact:true}).inputValue(),'Глава 2.');
-  await page.getByLabel('Автоматически',{exact:true}).check();
-  await page.getByRole('button',{name:'Найти главы',exact:true}).click();
-  await page.getByRole('button',{name:'Применить разбивку',exact:true}).click();
-  await page.setViewportSize({width:390,height:844});
-  await page.getByRole('button',{name:'Следующая глава',exact:true}).click();
-  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'chapter controls fit a phone');
-  await page.screenshot({path:artifacts+'/wbook-chapters-mobile.png',fullPage:true});
-  const beforeClearing=await page.locator('.reader-controls').getAttribute('data-index');
-  await page.getByRole('button',{name:'Настроить главы',exact:true}).click();
-  await page.getByRole('button',{name:'Убрать разбивку',exact:true}).click();
-  assert.equal(await page.locator('.reader-controls').getAttribute('data-index'),beforeClearing);
-  assert.match(await page.locator('.reader-text').innerText(),/Вступительный текст/);
-  assert.equal(await page.getByLabel('Читать по главам',{exact:true}).isChecked(),false);
-  await page.setViewportSize({width:1440,height:1040});
+  await page.getByLabel("Читать по главам", { exact: true }).waitFor();
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    "13",
+    "chapter settings preserve global progress on reload",
+  );
+  await page
+    .getByRole("button", { name: "Настроить главы", exact: true })
+    .click();
+  assert.equal(
+    await page.getByLabel("Начало заголовка", { exact: true }).inputValue(),
+    "Глава 2.",
+  );
+  await page.getByLabel("Автоматически", { exact: true }).check();
+  await page.getByRole("button", { name: "Найти главы", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Применить разбивку", exact: true })
+    .click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Следующая глава", exact: true })
+    .click();
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+    "chapter controls fit a phone",
+  );
+  await page.screenshot({
+    path: artifacts + "/wbook-chapters-mobile.png",
+    fullPage: true,
+  });
+  const beforeClearing = await page
+    .locator(".reader-controls")
+    .getAttribute("data-index");
+  await page
+    .getByRole("button", { name: "Настроить главы", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Убрать разбивку", exact: true })
+    .click();
+  assert.equal(
+    await page.locator(".reader-controls").getAttribute("data-index"),
+    beforeClearing,
+  );
+  assert.match(
+    await page.locator(".reader-text").innerText(),
+    /Вступительный текст/,
+  );
+  assert.equal(
+    await page.getByLabel("Читать по главам", { exact: true }).isChecked(),
+    false,
+  );
+  await page.setViewportSize({ width: 1440, height: 1040 });
   const long = await upload(
     "Большая книга.txt",
     Buffer.from(
@@ -798,7 +995,9 @@ try {
     (await page.locator(".reading-word").count()) < 1500,
     "large book renders only visible rows",
   );
+  await page.getByRole("button", { name: "WBook", exact: true }).click();
   await page.getByLabel("Позиция в тексте", { exact: true }).fill("50000");
+  await page.getByRole("button", { name: "Текст", exact: true }).click();
   await page.getByRole("button", { name: "Моё место" }).click();
   await page.waitForFunction(
     () => document.querySelector(".virtual-reader").scrollTop > 5000,

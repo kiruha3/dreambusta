@@ -1,15 +1,35 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
-import { session, send, loadSession, ui } from "./api";
+import {
+  session,
+  send,
+  loadSession,
+  ui,
+  loadNavigation,
+  sidebarMaterials,
+} from "./api";
 import Icon from "./components/Icon.vue";
 import SearchDialog from "./components/SearchDialog.vue";
 import AssistantWidget from "./components/AssistantWidget.vue";
 import { openSearch } from "./composables/search";
+import { materialSection } from "./composables/navigation";
 const route = useRoute();
-const admin = computed(() => route.path.startsWith("/admin"));
 const menu = ref(false);
+const headerQuery = ref("");
 const dark = ref(localStorage.getItem("dreambusta-theme") === "dark");
+const section = computed(() => {
+  if (route.path.startsWith("/library/")) return materialSection.value;
+  if (route.path.startsWith("/collections")) return "collection";
+  if (route.path === "/knowledge") return "knowledge";
+  if (route.path === "/library") return route.query.view || "all";
+  return "";
+});
+const pinnedActive = computed(
+  () =>
+    section.value === "all" &&
+    sidebarMaterials.value.some((m) => route.path === `/library/${m.slug}`),
+);
 watch(
   dark,
   (value) => {
@@ -20,7 +40,15 @@ watch(
 );
 watch(
   () => route.fullPath,
-  () => (menu.value = false),
+  () => {
+    menu.value = false;
+    headerQuery.value = "";
+  },
+);
+watch(
+  () => [route.path, session.editor, session.closed],
+  () => void loadNavigation(),
+  { immediate: true },
 );
 async function logout() {
   await send("/logout", "POST", {});
@@ -29,40 +57,44 @@ async function logout() {
 }
 </script>
 <template>
-  <div class="app-shell" :class="{ 'reader-shell': route.name === 'reader' }">
+  <div class="app-shell">
     <aside class="sidebar" :class="{ open: menu }">
       <RouterLink class="brand" to="/library"
         ><span class="brand-logo"><Icon name="library" :size="23" /></span
         >DreamBusta</RouterLink
       >
-      <span class="eyebrow sidebar-label">ОБЩАЯ БИБЛИОТЕКА</span>
+      <span class="eyebrow sidebar-label">БИБЛИОТЕКА</span>
       <nav aria-label="Библиотека">
         <RouterLink
           to="/library"
-          :class="{
-            active: route.path.startsWith('/library') && !route.query.view,
-          }"
+          :class="{ active: section === 'all' && !pinnedActive }"
           ><Icon name="library" />Все материалы</RouterLink
+        >
+        <RouterLink to="/knowledge" :class="{ active: section === 'knowledge' }"
+          ><Icon name="book" />База знаний</RouterLink
         >
         <RouterLink
           to="/collections"
-          :class="{ active: route.path.startsWith('/collections') }"
+          :class="{ active: section === 'collection' }"
           ><Icon name="collections" />Подборки</RouterLink
         >
         <RouterLink
           to="/library?view=continue"
-          :class="{ active: route.query.view === 'continue' }"
+          :class="{ active: section === 'continue' }"
           ><Icon name="book" />Продолжить чтение</RouterLink
         >
         <RouterLink
           to="/library?view=favorites"
-          :class="{ active: route.query.view === 'favorites' }"
+          :class="{ active: section === 'favorites' }"
           ><Icon name="heart" />Избранное</RouterLink
         >
       </nav>
-      <template v-if="session.editor"
-        ><span class="eyebrow sidebar-label">УПРАВЛЕНИЕ</span>
+      <template v-if="session.editor">
+        <span class="eyebrow sidebar-label">УПРАВЛЕНИЕ</span>
         <nav aria-label="Управление">
+          <RouterLink to="/admin" :class="{ active: route.path === '/admin' }"
+            ><Icon name="grid" />Кабинет редактора</RouterLink
+          >
           <RouterLink
             to="/admin/materials"
             :class="{ active: route.path.startsWith('/admin/materials') }"
@@ -70,29 +102,36 @@ async function logout() {
           >
           <RouterLink
             to="/admin/add"
-            :class="{ active: route.path.startsWith('/admin/add') }"
+            :class="{ active: route.path === '/admin/add' }"
             ><Icon name="plus" />Добавить материал</RouterLink
           >
           <RouterLink
-            to="/admin/sources"
-            :class="{ active: route.path.startsWith('/admin/sources') }"
-            ><Icon name="link" />Источники</RouterLink
+            to="/admin/widgets"
+            :class="{ active: route.path === '/admin/widgets' }"
+            ><Icon name="chat" />Внешние помощники</RouterLink
           >
           <RouterLink
             to="/admin/settings"
-            :class="{ active: route.path.startsWith('/admin/settings') }"
+            :class="{ active: route.path === '/admin/settings' }"
             ><Icon name="settings" />Настройки</RouterLink
           >
-        </nav></template
-      >
-      <div class="sidebar-foot">
-        <div class="notice compact">
-          <Icon name="info" /><span
-            >Одна библиотека для чтения, Академии и приложения.</span
+        </nav>
+      </template>
+      <template v-if="sidebarMaterials.length">
+        <span class="eyebrow sidebar-label">БЫСТРЫЙ ДОСТУП</span>
+        <nav aria-label="Выбранные материалы">
+          <RouterLink
+            v-for="m in sidebarMaterials"
+            :key="m.id"
+            :to="`/library/${m.slug}`"
+            :class="{
+              active: pinnedActive && route.path === `/library/${m.slug}`,
+            }"
+            ><Icon name="book" /><span>{{ m.title }}</span></RouterLink
           >
-        </div>
-        <small>DreamBusta · локальная библиотека</small>
-      </div>
+        </nav>
+      </template>
+      <div class="sidebar-foot"><small>DreamBusta</small></div>
     </aside>
     <button
       v-if="menu"
@@ -102,27 +141,34 @@ async function logout() {
     ></button>
     <div class="main-shell">
       <header class="topbar">
-        <div class="row">
+        <button
+          class="icon-button mobile-menu"
+          aria-label="Открыть меню"
+          @click="menu = !menu"
+        >
+          <Icon name="menu" />
+        </button>
+        <form
+          class="top-search"
+          role="search"
+          @submit.prevent="openSearch(headerQuery.trim() || undefined)"
+        >
+          <Icon name="search" :size="18" />
+          <input
+            v-model="headerQuery"
+            aria-label="Поиск по всем материалам"
+            placeholder="Поиск по текстам, названиям и темам"
+            maxlength="300"
+          />
           <button
-            class="icon-button mobile-menu"
-            aria-label="Открыть меню"
-            @click="menu = !menu"
-          >
-            <Icon name="menu" /></button
-          ><span class="muted">{{
-            admin ? "Управление библиотекой" : "Библиотека"
-          }}</span
-          ><span class="top-divider">/</span
-          ><span>{{ admin ? "Редактор" : "Материалы и знания" }}</span>
-        </div>
-        <div class="row gap8">
-          <button
+            type="submit"
             class="button small global-search-trigger"
             aria-label="Поиск по библиотеке"
-            @click="openSearch"
           >
-            <Icon name="search" :size="16" /><span>Поиск</span><kbd>Ctrl K</kbd>
+            Найти <kbd>Ctrl K</kbd>
           </button>
+        </form>
+        <div class="row gap8 top-actions">
           <button
             class="icon-button"
             :aria-label="dark ? 'Светлая тема' : 'Тёмная тема'"
@@ -136,8 +182,9 @@ async function logout() {
             aria-label="Выйти"
             @click="logout"
           >
-            <Icon name="logout" /></button
-          ><RouterLink v-else class="button small" to="/login">{{
+            <Icon name="logout" />
+          </button>
+          <RouterLink v-else class="button small" to="/login">{{
             session.setupRequired ? "Создать редактора" : "Войти"
           }}</RouterLink>
           <span v-if="session.editor" class="avatar" :title="session.email">{{
@@ -150,7 +197,6 @@ async function logout() {
     <div v-if="ui.notice" class="toast" role="status">
       <Icon name="check" />{{ ui.notice }}
     </div>
-    <SearchDialog />
-    <AssistantWidget />
+    <SearchDialog /><AssistantWidget />
   </div>
 </template>

@@ -186,6 +186,32 @@ onBeforeUnmount(() => {
     >
       <Icon name="collections" :size="15" />Страницы
     </button>
+    <div class="pdf-toolbar-modes" role="group" aria-label="Вид навигации PDF">
+      <button
+        class="icon-button"
+        aria-label="Список"
+        title="Список страниц"
+        :aria-pressed="pageListOpen && pageNavigationMode === 'list'"
+        @click="
+          pageNavigationMode = 'list';
+          pageListOpen = true;
+        "
+      >
+        <Icon name="list" :size="16" />
+      </button>
+      <button
+        class="icon-button"
+        aria-label="Миниатюры"
+        title="Миниатюры страниц"
+        :aria-pressed="pageListOpen && pageNavigationMode === 'thumbnails'"
+        @click="
+          pageNavigationMode = 'thumbnails';
+          pageListOpen = true;
+        "
+      >
+        <Icon name="grid" :size="16" />
+      </button>
+    </div>
     <button
       class="icon-button"
       aria-label="Предыдущая страница"
@@ -241,20 +267,6 @@ onBeforeUnmount(() => {
       :class="{ 'pdf-thumbnails': pageNavigationMode === 'thumbnails' }"
       aria-label="Страницы PDF"
     >
-      <div class="pdf-sidebar-modes" aria-label="Вид навигации PDF">
-        <button
-          :aria-pressed="pageNavigationMode === 'list'"
-          @click="pageNavigationMode = 'list'"
-        >
-          Список
-        </button>
-        <button
-          :aria-pressed="pageNavigationMode === 'thumbnails'"
-          @click="pageNavigationMode = 'thumbnails'"
-        >
-          Миниатюры
-        </button>
-      </div>
       <template v-if="pdf"
         ><button
           v-for="page in pages"

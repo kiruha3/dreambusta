@@ -256,7 +256,7 @@ try {
   await page.goto(
     base + `/library/${book.slug}?view=text&paragraph=25&offset=4&version=1`,
   );
-  await page.locator(".reader-controls").waitFor();
+  await page.locator(".virtual-reader").waitFor();
   assert.equal(
     await page.locator(".reader-controls").getAttribute("data-index"),
     firstWordIndex,

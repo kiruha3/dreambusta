@@ -118,8 +118,13 @@ export class SearchIndex {
     }
   }
   allowed(options: SearchQuery, editor: boolean) {
+    const scope =
+      options.allowedMaterialIds === undefined
+        ? undefined
+        : new Set(options.allowedMaterialIds);
     let materials = this.materials().filter(
       (m) =>
+        (!scope || scope.has(m.id)) &&
         (editor || m.visible) &&
         m.state === "ready" &&
         m.source.status !== "removed",
@@ -148,14 +153,16 @@ export class SearchIndex {
     const terms = queryTerms(options.query);
     if (!terms.length) return [];
     const allowed = this.allowed(options, editor);
+    if (!allowed.size) return [];
     const hashes = new Map([...allowed].map(([id, m]) => [id, this.hash(m)]));
     const query = terms.map((t) => `"${t}"*`).join(" OR ");
-    // Apply visibility and scope before pagination/counts. FTS syntax is built only from Unicode words.
+    // Restrict retrieval before ranking, fusion, pagination and counts.
+    // FTS syntax is built only from Unicode words; JSON binds arbitrarily sized ID scopes safely.
     const rows = this.store.db
       .prepare(
-        "SELECT c.data FROM search_fts f JOIN search_chunks c ON c.id=f.chunk_id WHERE search_fts MATCH ? ORDER BY bm25(search_fts,0,0,8,3,1)",
+        "SELECT c.data FROM search_fts f JOIN search_chunks c ON c.id=f.chunk_id WHERE search_fts MATCH ? AND c.material_id IN (SELECT value FROM json_each(?)) ORDER BY bm25(search_fts,0,0,8,3,1)",
       )
-      .all(query);
+      .all(query, JSON.stringify([...allowed.keys()]));
     return rows.flatMap((row) => {
       const chunk = JSON.parse(row.data as string) as SearchChunk;
       const m = allowed.get(chunk.materialId);

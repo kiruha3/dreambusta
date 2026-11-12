@@ -13,6 +13,7 @@ import {
   logout,
 } from "./auth.ts";
 import type { Material } from "../shared/types.ts";
+import { isKnowledge } from "../shared/knowledge.ts";
 import { upload, serveFile } from "./uploads.ts";
 import { Shares, resolveLink, validateImportOptions } from "./shares.ts";
 import { saveCover } from "./covers.ts";
@@ -24,6 +25,7 @@ import { SearchService } from "./search/service.ts";
 import type { Models } from "./search/models.ts";
 import { LocalModels } from "./search/models.ts";
 import type { SearchQuery } from "../shared/search.ts";
+import { createWidgetHandler } from "./widgets.ts";
 
 export class HttpError extends Error {
   status: number;
@@ -62,7 +64,7 @@ function editable(body: Record<string, unknown>): Partial<Material> {
       p[key] = (body[key] as string).trim();
     }
   if ("title" in p && !p.title) throw new HttpError(400, "Укажите название");
-  for (const key of ["visible", "downloadable"] as const)
+  for (const key of ["visible", "downloadable", "knowledge"] as const)
     if (key in body) {
       if (typeof body[key] !== "boolean")
         throw new HttpError(400, "Ожидалось логическое значение");
@@ -110,6 +112,7 @@ export function createApp({
     dataDir,
   });
   const answerAttempts = new Map<string, { since: number; count: number }>();
+  const handleWidget = createWidgetHandler({ store, search });
   let activeAnswers = 0;
   const attempts = new Map<string, { count: number; time: number }>();
   const server = createServer(async (req, res) => {
@@ -118,6 +121,7 @@ export function createApp({
     res.setHeader("Cache-Control", "no-store");
     try {
       const url = new URL(req.url || "/", "http://localhost");
+      if (await handleWidget(req, res, url)) return;
       const parts = url.pathname
         .split("/")
         .filter(Boolean)
@@ -372,11 +376,57 @@ export function createApp({
         if (!editor) throw new HttpError(401, "Войдите как редактор");
         if (method === "PATCH") {
           const b = await readJson(req);
-          if (typeof b.closed !== "boolean")
+          if (
+            ("closed" in b && typeof b.closed !== "boolean") ||
+            !("closed" in b || "sidebarMaterialIds" in b)
+          )
             throw new HttpError(400, "Некорректная настройка");
-          store.setSetting("closed", String(b.closed));
+          if (
+            "sidebarMaterialIds" in b &&
+            (!Array.isArray(b.sidebarMaterialIds) ||
+              b.sidebarMaterialIds.length > 30 ||
+              b.sidebarMaterialIds.some(
+                (id: unknown) =>
+                  typeof id !== "string" ||
+                  !store.listMaterials().some((m) => m.id === id),
+              ))
+          )
+            throw new HttpError(400, "Выберите до 30 существующих материалов");
+          store.transaction(() => {
+            if ("closed" in b) store.setSetting("closed", String(b.closed));
+            if ("sidebarMaterialIds" in b)
+              store.setSetting(
+                "sidebarMaterialIds",
+                JSON.stringify([...new Set(b.sidebarMaterialIds)]),
+              );
+          });
         }
-        return json(res, 200, { closed: store.setting("closed") === "true" });
+        return json(res, 200, {
+          closed: store.setting("closed") === "true",
+          sidebarMaterialIds: JSON.parse(
+            store.setting("sidebarMaterialIds", "[]"),
+          ),
+        });
+      }
+      if (parts[1] === "navigation" && method === "GET") {
+        const ids: string[] = JSON.parse(
+          store.setting("sidebarMaterialIds", "[]"),
+        );
+        const materials = store.listMaterials();
+        return json(res, 200, {
+          materials: ids.flatMap((id) => {
+            const m = materials.find(
+              (m) =>
+                m.id === id &&
+                (editor || m.visible) &&
+                m.state === "ready" &&
+                m.source.status !== "removed",
+            );
+            return m
+              ? [{ id: m.id, slug: m.slug, title: m.title, kind: m.kind }]
+              : [];
+          }),
+        });
       }
       if (parts[1] === "materials") {
         if (!parts[2]) {
@@ -387,6 +437,11 @@ export function createApp({
               store
                 .listMaterials()
                 .filter((m) => editor || m.visible)
+                .filter(
+                  (m) =>
+                    url.searchParams.get("section") !== "knowledge" ||
+                    isKnowledge(m),
+                )
                 .map((m) => publicMaterial(m, true)),
             );
           if (method === "POST") {

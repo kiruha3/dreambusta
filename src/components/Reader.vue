@@ -354,35 +354,44 @@ onBeforeUnmount(() => {
         </div>
       </div></template
     >
-    <div class="reader-controls" :data-index="index">
+    <div v-show="speedMode" class="reader-controls" :data-index="index">
       <div v-if="speedMode" class="row speed-row">
-        <button
-          class="icon-button"
-          aria-label="Назад на 10 слов"
-          @click="seek(index - 10)"
+        <div
+          class="reader-playback"
+          role="group"
+          aria-label="Управление чтением"
         >
-          <Icon name="left" /></button
-        ><button
-          class="button primary play-button"
-          :aria-label="playing ? 'Пауза' : 'Начать чтение'"
-          @click="toggle"
+          <button
+            class="icon-button"
+            aria-label="Назад на 10 слов"
+            @click="seek(index - 10)"
+          >
+            <Icon name="left" /></button
+          ><button
+            class="button primary play-button"
+            :aria-label="playing ? 'Пауза' : 'Начать чтение'"
+            @click="toggle"
+          >
+            <Icon :name="playing ? 'pause' : 'play'" :size="20" /></button
+          ><button
+            class="icon-button"
+            aria-label="Вперёд на 10 слов"
+            @click="seek(index + 10)"
+          >
+            <Icon name="right" />
+          </button>
+        </div>
+        <label class="reader-speed"
+          ><input
+            v-model.number="speed"
+            class="speed-slider"
+            type="range"
+            min="60"
+            max="1200"
+            step="5"
+            aria-label="Скорость чтения"
+          /><span>{{ speed }} слов/мин</span></label
         >
-          <Icon :name="playing ? 'pause' : 'play'" :size="20" /></button
-        ><button
-          class="icon-button"
-          aria-label="Вперёд на 10 слов"
-          @click="seek(index + 10)"
-        >
-          <Icon name="right" /></button
-        ><input
-          v-model.number="speed"
-          class="speed-slider"
-          type="range"
-          min="60"
-          max="1200"
-          step="5"
-          aria-label="Скорость чтения"
-        /><span>{{ speed }} слов/мин</span>
       </div>
       <div class="reader-progress-row">
         <span>{{ percent }}%</span
@@ -398,21 +407,12 @@ onBeforeUnmount(() => {
           {{ tokens.length.toLocaleString("ru") }}</span
         >
       </div>
-      <small class="muted" style="font-size: 10px"
-        >Позиция хранится в этом браузере ·
-        {{
-          speedMode
-            ? "Пробел — старт/пауза, стрелки — позиция и скорость"
-            : "Нажмите на слово, чтобы продолжить с него"
-        }}</small
-      >
     </div>
     <section class="reader-full-text" aria-label="Полный текст">
       <h3 v-if="speedMode" class="reader-text-heading">
         <Icon name="book" :size="16" />{{
           chapterMode ? "Текст главы" : "Полный текст"
         }}
-        <small class="muted">Нажмите на слово, чтобы продолжить с него</small>
       </h3>
       <div class="text-toolbar">
         <label class="search-box"
@@ -421,7 +421,11 @@ onBeforeUnmount(() => {
             placeholder="Поиск в тексте"
             aria-label="Поиск в тексте"
         /></label>
-        <div class="row gap8">
+        <div
+          class="reader-text-actions"
+          role="group"
+          aria-label="Настройки текста"
+        >
           <button
             class="icon-button"
             aria-label="Уменьшить шрифт"
@@ -436,8 +440,8 @@ onBeforeUnmount(() => {
           >
             A+
           </button>
+          <button class="button small" @click="currentPlace">Моё место</button>
         </div>
-        <button class="button small" @click="currentPlace">Моё место</button>
       </div>
       <BookText
         :key="chapterMode ? activeChapter.start : 'full'"
@@ -447,6 +451,7 @@ onBeforeUnmount(() => {
         :font-size="fontSize"
         :search="search"
         :follow-current="speedMode && playing"
+        :fit-viewport="!speedMode"
         @select="seek"
       />
     </section>

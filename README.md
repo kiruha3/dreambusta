@@ -5,6 +5,7 @@
 ## Запуск
 
 Подробная [инструкция запуска, развёртывания, обновления и резервирования](docs/operations.md).
+Управление [базой знаний, меню и внешними помощниками](docs/knowledge-widgets.md).
 
 Короткие команды Windows/Linux: `npm run dev`, `npm run doctor`, `npm run check`,
 `npm run release`. При наличии GNU Make: `make dev`, `make doctor`, `make check`,

@@ -608,7 +608,7 @@ progress {
   border-radius: var(--radius);
   padding: 24px;
 }
-.panel + .panel {
+.content > .panel + .panel {
   margin-top: 20px;
 }
 .stack > .panel + .panel {
@@ -1524,20 +1524,90 @@ td .row {
   padding: 5px 8px;
   text-align: center;
 }
-.pdf-workspace { display: grid; grid-template-columns: minmax(0, 1fr); height: 75vh; min-height: 380px; max-height: 1000px; }
-.pdf-with-pages { grid-template-columns: 130px minmax(0, 1fr); }
-.pdf-page-area { position: relative; min-width: 0; min-height: 0; }
-.pdf-canvas-stage { position: absolute; inset: 0; overflow: auto; background: #d4d4d8; }
-.pdf-canvas-stage .pdfViewer { padding: 16px 0; }
-.pdf-canvas-stage canvas { display: block; max-width: none; }
-.pdf-page-list { overflow: auto; padding: 8px; border-right: 1px solid var(--border); background: var(--muted); }
-.pdf-page-list button { display: block; padding: 9px 6px; text-align: left; width: 100%; border: 1px solid transparent; border-radius: 5px; margin-bottom: 3px; font-size: 12px; color: var(--muted-foreground); background: transparent; }
-.pdf-page-list button[aria-current="page"] { border-color: var(--ring); background: var(--background); color: var(--foreground); }
-.pdf-sidebar-modes { position: sticky; top: -8px; z-index: 1; padding: 4px 0 8px; background: var(--muted); }
-.pdf-sidebar-modes > button { padding: 6px 3px; font-size: 10px; text-align: center; }
-.pdf-sidebar-modes > button[aria-pressed="true"] { border-color: var(--ring); background: var(--background); color: var(--foreground); }
-.pdf-thumbnails > button { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 10px; }
-.pdf-thumbnail { display: block; width: 96px; max-width: 100%; height: auto; min-height: 60px; background: white; box-shadow: 0 1px 5px #0003; }
+.pdf-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 75vh;
+  min-height: 380px;
+  max-height: 1000px;
+}
+.pdf-with-pages {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+.pdf-page-area {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.pdf-canvas-stage {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: #d4d4d8;
+}
+.pdf-canvas-stage .pdfViewer {
+  padding: 16px 0;
+}
+.pdf-canvas-stage canvas {
+  display: block;
+  max-width: none;
+}
+.pdf-page-list {
+  overflow: auto;
+  padding: 8px;
+  border-right: 1px solid var(--border);
+  background: var(--muted);
+}
+.pdf-page-list button {
+  display: block;
+  padding: 9px 6px;
+  text-align: left;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.pdf-page-list button[aria-current="page"] {
+  border-color: var(--ring);
+  background: var(--background);
+  color: var(--foreground);
+}
+.pdf-sidebar-modes {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  padding: 4px 0 8px;
+  background: var(--muted);
+}
+.pdf-sidebar-modes > button {
+  padding: 6px 3px;
+  font-size: 10px;
+  text-align: center;
+}
+.pdf-sidebar-modes > button[aria-pressed="true"] {
+  border-color: var(--ring);
+  background: var(--background);
+  color: var(--foreground);
+}
+.pdf-thumbnails > button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.pdf-thumbnail {
+  display: block;
+  width: 96px;
+  max-width: 100%;
+  height: auto;
+  min-height: 60px;
+  background: white;
+  box-shadow: 0 1px 5px #0003;
+}
 .slides-stage {
   position: relative;
   width: 100%;
@@ -1638,7 +1708,9 @@ td .row {
   color: #18181b;
   background: #f4f4f5;
 }
-.docx-island .docx-readonly-bar { display: none; }
+.docx-island .docx-readonly-bar {
+  display: none;
+}
 .docx-island [contenteditable] {
   caret-color: transparent;
 }
@@ -2018,39 +2090,166 @@ td .row {
 }
 
 /* WBook chapter navigation keeps original word positions in the virtual text. */
-.chapter-controls { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.chapter-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
-.chapter-checkbox { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; cursor: pointer; }
-.chapter-checkbox input { width: 16px; height: 16px; flex-shrink: 0; }
-.chapter-source { margin-left: auto; font-size: 10px; }
-.chapter-navigation { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px auto; align-items: center; gap: 8px; margin-top: 14px; }
-.chapter-current { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.chapter-current strong { font-size: 12px; overflow-wrap: anywhere; line-height: 1.5; }
-.chapter-current small { font-size: 10px; }
-.chapter-empty { margin-top: 10px; font-size: 11px; }
-.chapter-toc { margin-top: 12px; }
-.chapter-list { max-height: 280px; overflow: auto; margin-top: 8px; }
-.chapter-list > button { display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 5px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.chapter-list > button:hover, .chapter-list > button[aria-current] { background: var(--muted); }
-.chapter-settings { display: flex; flex-direction: column; align-items: stretch; gap: 12px; border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; font-size: 12px; }
-.chapter-settings fieldset { border: 0; padding: 0; min-width: 0; display: flex; gap: 12px; flex-wrap: wrap; }
-.chapter-settings legend { margin-bottom: 9px; font-weight: 500; }
-.chapter-settings fieldset label { display: inline-flex; gap: 7px; align-items: center; cursor: pointer; }
-.chapter-settings fieldset input { width: 14px; height: 14px; }
-.chapter-settings > p, .chapter-preview p { font-size: 11px; line-height: 1.7; }
-.chapter-settings > button { align-self: start; }
-.chapter-marker { display: flex; flex-direction: column; gap: 7px; }
-.chapter-settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.chapter-preview { padding: 10px 12px; border: 1px solid var(--border); background: var(--muted); border-radius: 6px; }
-.chapter-preview ol { padding-left: 20px; line-height: 1.8; font-size: 11px; overflow-wrap: anywhere; }
+.chapter-controls {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.chapter-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.chapter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chapter-checkbox input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.chapter-source {
+  margin-left: auto;
+  font-size: 10px;
+}
+.chapter-navigation {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chapter-current {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.chapter-current strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.chapter-current small {
+  font-size: 10px;
+}
+.chapter-empty {
+  margin-top: 10px;
+  font-size: 11px;
+}
+.chapter-toc {
+  margin-top: 12px;
+}
+.chapter-list {
+  max-height: 280px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.chapter-list > button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.chapter-list > button:hover,
+.chapter-list > button[aria-current] {
+  background: var(--muted);
+}
+.chapter-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+  padding-top: 14px;
+  font-size: 12px;
+}
+.chapter-settings fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chapter-settings legend {
+  margin-bottom: 9px;
+  font-weight: 500;
+}
+.chapter-settings fieldset label {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  cursor: pointer;
+}
+.chapter-settings fieldset input {
+  width: 14px;
+  height: 14px;
+}
+.chapter-settings > p,
+.chapter-preview p {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.chapter-settings > button {
+  align-self: start;
+}
+.chapter-marker {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.chapter-settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chapter-preview {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  border-radius: 6px;
+}
+.chapter-preview ol {
+  padding-left: 20px;
+  line-height: 1.8;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 600px) {
-  .chapter-controls { padding: 14px; }
-  .chapter-source { display: none; }
-  .chapter-toolbar > button { margin-left: auto; }
-  .chapter-navigation { grid-template-columns: 30px minmax(0, 1fr) 30px; }
-  .chapter-navigation > button:last-child { grid-column: 1 / -1; justify-content: center; }
-  .pdf-with-pages { grid-template-columns: 100px minmax(0, 1fr); }
-  .pdf-page-list button { font-size: 11px; padding: 8px 3px; }
+  .chapter-controls {
+    padding: 14px;
+  }
+  .chapter-source {
+    display: none;
+  }
+  .chapter-toolbar > button {
+    margin-left: auto;
+  }
+  .chapter-navigation {
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+  }
+  .chapter-navigation > button:last-child {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  .pdf-with-pages {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+  .pdf-page-list button {
+    font-size: 11px;
+    padding: 8px 3px;
+  }
 }
 
 /* Global content search */
@@ -2316,4 +2515,206 @@ td .row {
   .library-search-foot {
     padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   }
+}
+
+/* Knowledge navigation and editor workspace */
+.sidebar {
+  overflow-y: auto;
+}
+.sidebar nav a span {
+  overflow-wrap: anywhere;
+}
+.topbar {
+  gap: 14px;
+}
+.top-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 5px 4px 12px;
+  background: var(--muted);
+}
+.top-search input:not([type]) {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px;
+  min-height: 30px;
+}
+.top-search .button {
+  flex-shrink: 0;
+}
+.top-actions {
+  flex-shrink: 0;
+}
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.admin-tile {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  gap: 12px;
+  transition: border-color 0.15s;
+  margin: 0;
+}
+.admin-tile:hover {
+  border-color: var(--ring);
+}
+.settings-materials {
+  max-height: 310px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-materials .check-label {
+  align-items: start;
+}
+.settings-materials input {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.settings-order {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-order li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.settings-order li > span {
+  flex: 1;
+}
+.widget-editor {
+  display: flex;
+  gap: 22px;
+  align-items: start;
+}
+.widget-list {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+.widget-list button {
+  text-align: left;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.widget-list button:hover,
+.widget-list button.active {
+  background: var(--muted);
+}
+.widget-list small {
+  color: var(--muted-foreground);
+}
+.embed-code {
+  font-family: monospace;
+  font-size: 12px;
+}
+.widget-preview {
+  width: 100%;
+  height: 500px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+@media (max-width: 1100px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .widget-editor {
+    flex-direction: column;
+  }
+  .widget-list {
+    width: 100%;
+  }
+  .widget-editor > .stack {
+    width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .top-search {
+    gap: 4px;
+    padding-left: 7px;
+  }
+  .top-search kbd,
+  .top-actions .avatar {
+    display: none;
+  }
+  .top-search input {
+    font-size: 12px;
+  }
+  .top-search .button {
+    padding: 7px;
+  }
+}
+@media (max-width: 600px) {
+  .admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Grid containers own their spacing; cards never shift on hover. */
+.cards,
+.collection-grid {
+  align-items: stretch;
+}
+.cards > *,
+.collection-grid > *,
+.admin-grid > * {
+  min-width: 0;
+  margin: 0;
+}
+.material-card:hover {
+  transform: none;
+}
+.sidebar nav a {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+}
+.sidebar nav a > svg {
+  justify-self: center;
+}
+.collection-card {
+  display: flex;
+  flex-direction: column;
+}
+.collection-card > .row:last-child {
+  margin-top: auto;
+  padding-top: 16px;
+}
+.page-heading > div,
+.field {
+  min-width: 0;
+}
+.page-heading > .button {
+  flex-shrink: 0;
 }

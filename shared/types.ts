@@ -59,6 +59,7 @@ export interface Material {
   kind: Kind;
   visible: boolean;
   downloadable: boolean;
+  knowledge?: boolean;
   tags: string[];
   createdAt: string;
   updatedAt: string;

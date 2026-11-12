@@ -36,6 +36,9 @@ import {
   Menu,
   ArrowUp,
   ArrowDown,
+  List,
+  LayoutGrid,
+  MessageCircle,
 } from "lucide-vue-next";
 defineProps<{ name: string; size?: number }>();
 const icons: Record<string, any> = {
@@ -75,6 +78,9 @@ const icons: Record<string, any> = {
   menu: Menu,
   up: ArrowUp,
   down: ArrowDown,
+  list: List,
+  grid: LayoutGrid,
+  chat: MessageCircle,
 };
 </script>
 <template>

@@ -1,6 +1,8 @@
 import type { Kind } from "./types.ts";
 export interface SearchQuery {
   query: string;
+  /** Internal authorization scope; never populate from public query parameters. Empty denies all. */
+  allowedMaterialIds?: readonly string[];
   kind?: Kind | "";
   collection?: string;
   material?: string;

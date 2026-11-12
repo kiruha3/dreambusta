@@ -9,7 +9,8 @@ import {
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, kindNames, session } from "../api";
-import { searchOpen } from "../composables/search";
+import { searchOpen, searchSeed } from "../composables/search";
+import { withContext } from "../lib/navigation";
 import { openAssistant } from "../composables/assistant";
 import type { Collection } from "../../shared/types";
 import type {
@@ -102,6 +103,7 @@ watch(searchOpen, async (open) => {
     return;
   }
   previousFocus = document.activeElement as HTMLElement;
+  if (searchSeed.value !== undefined) query.value = searchSeed.value;
   response.value = undefined;
   error.value = "";
   await nextTick();
@@ -135,7 +137,14 @@ function ask() {
 }
 async function choose(result: SearchResult) {
   close();
-  await router.push(result.url);
+  await router.push(
+    withContext(
+      result.url,
+      scope.value.startsWith("collection:")
+        ? { from: "collection", collection: scope.value.slice(11) }
+        : route.query,
+    ),
+  );
 }
 function key(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {

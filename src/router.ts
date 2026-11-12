@@ -5,6 +5,7 @@ export const router = createRouter({
   routes: [
     { path: "/", redirect: "/library" },
     { path: "/library", component: () => import("./pages/Catalog.vue") },
+    { path: "/knowledge", component: () => import("./pages/Catalog.vue") },
     { path: "/library/:slug", component: () => import("./pages/Material.vue") },
     {
       path: "/collections",
@@ -15,7 +16,8 @@ export const router = createRouter({
       component: () => import("./pages/Collection.vue"),
     },
     { path: "/login", component: () => import("./pages/Login.vue") },
-    { path: "/admin", redirect: "/admin/materials" },
+    { path: "/admin", component: () => import("./pages/Admin.vue") },
+    { path: "/admin/widgets", component: () => import("./pages/Widgets.vue") },
     {
       path: "/admin/materials",
       component: () => import("./pages/AdminMaterials.vue"),

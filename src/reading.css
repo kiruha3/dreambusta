@@ -1,0 +1,453 @@
+/* Each reading mode keeps its own viewport below the shared controls. */
+.reading-page {
+  --reading-width: 780px;
+  min-width: 0;
+}
+.reading-page[data-reading-width="narrow"] {
+  --reading-width: 650px;
+}
+.reading-page[data-reading-width="wide"] {
+  --reading-width: 1040px;
+}
+.material-breadcrumbs {
+  margin: 0 0 22px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.material-breadcrumbs ol {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.material-breadcrumbs li {
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.material-breadcrumbs li + li::before {
+  content: "/";
+  color: var(--muted-foreground);
+}
+.material-breadcrumbs a:hover {
+  text-decoration: underline;
+}
+.material-breadcrumbs [aria-current] {
+  color: var(--foreground);
+}
+.reading-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+.reading-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.reading-controls select {
+  width: auto;
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+}
+.reading-controls [aria-expanded="true"] {
+  background: var(--muted);
+  border-color: var(--ring);
+}
+.article-reading-position {
+  position: sticky;
+  top: 70px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+  font-size: 11px;
+}
+.article-reading-position progress {
+  flex: 1;
+  height: 5px;
+  min-width: 0;
+  accent-color: var(--primary);
+}
+.article-reading-position span {
+  white-space: nowrap;
+}
+.reading-page .material-workspace {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.reading-page .material-workspace.with-material-info {
+  grid-template-columns: minmax(0, 1fr) 235px;
+}
+.reading-page .material-workspace.with-publication-tree {
+  grid-template-columns: minmax(0, 1fr) 16px var(
+      --publication-tree-width,
+      240px
+    );
+  column-gap: 0;
+}
+.reading-page .material-workspace > .viewer-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+.reading-page .material-workspace > .publication-sidebar {
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+.publication-splitter {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  color: var(--muted-foreground);
+}
+.publication-splitter > span {
+  position: sticky;
+  top: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border-radius: 5px;
+}
+.publication-splitter:hover > span,
+.publication-splitter:focus-visible > span {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.reading-page .material-workspace > .material-info {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+}
+.reading-page .material-workspace.with-publication-tree > .material-info {
+  grid-column: 1;
+  grid-row: 2;
+}
+.reading-page .publication-sidebar nav {
+  display: block;
+}
+.reading-page .publication-sidebar h3 {
+  display: block;
+}
+.reading-page.article-mode .viewer-panel {
+  overflow: visible;
+}
+.reading-page.article-mode .viewer-toolbar {
+  border-radius: 10px 10px 0 0;
+}
+.reading-page .reading-article {
+  width: 100%;
+  max-width: var(--reading-width);
+  max-height: none;
+  height: 500px;
+  min-height: 200px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  margin-inline: auto;
+  padding: 28px 34px 42px;
+  line-height: 1.6;
+}
+.reading-page .reading-article :is(p, ul, ol, pre, blockquote) {
+  margin-block: 0.5em;
+}
+.reading-page .reading-article :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.3;
+  margin: 1.25em 0 0.25em;
+}
+.reading-page .reading-article h1 {
+  font-size: 1.875em;
+}
+.reading-page .reading-article h2 {
+  font-size: 1.5em;
+}
+.reading-page .reading-article h3 {
+  font-size: 1.25em;
+}
+.reading-page .reading-article li {
+  margin-block: 0.125em;
+}
+.reading-page .reading-article li > p {
+  margin-block: 0;
+}
+.reading-page .reading-article li > :is(ul, ol) {
+  margin-block: 0.125em;
+}
+.reading-page .reading-article > div > :first-child {
+  margin-top: 0;
+}
+.reading-page .reading-article table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.reading-page .reading-article pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.reading-page .reading-article :is(iframe, video, svg) {
+  max-width: 100%;
+}
+.reading-page .reader-full-text {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-inline: auto;
+  min-width: 0;
+}
+.reading-page .virtual-reader {
+  line-height: 1.6;
+  overscroll-behavior: contain;
+}
+.reading-page .virtual-reader.viewport-fit-reader {
+  min-height: 200px;
+  max-height: none;
+}
+.reading-page
+  .reader-layout
+  > :is(.chapter-controls, .focus-stage, .reader-controls) {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-inline: auto;
+}
+.reading-page .reader-layout:not(.speed-reading) > .reader-controls {
+  order: 0;
+}
+.reading-page .reader-layout:not(.speed-reading) > .reader-full-text {
+  order: 1;
+  border-top: 0;
+}
+.reading-page .reader-controls {
+  padding: 14px 20px;
+  gap: 12px;
+}
+.reading-page .reader-controls .speed-row {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+.reader-playback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.reader-speed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: 12px;
+}
+.reading-page .reader-speed input.speed-slider {
+  width: 150px;
+  max-width: 100%;
+  min-width: 60px;
+}
+.reader-speed span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.reading-page .reader-progress-row {
+  display: grid;
+  grid-template-columns: 34px minmax(60px, 1fr) auto;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.reading-page .reader-full-text .text-toolbar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+.reading-page .text-toolbar .search-box {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+}
+.reading-page .text-toolbar input {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+.reader-text-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.reader-text-actions .icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+.reader-text-actions .button {
+  min-height: 32px;
+  margin-left: 4px;
+}
+.reading-page .pdf-controls {
+  justify-content: flex-start;
+}
+.reading-page .virtual-reader-rows {
+  line-height: 1.6;
+}
+.reading-page .virtual-paragraph {
+  padding-bottom: 0.35em;
+}
+.reading-page .material-info p {
+  line-height: 1.6;
+}
+.pdf-toolbar-modes {
+  display: flex;
+  gap: 2px;
+}
+.pdf-toolbar-modes .icon-button {
+  width: 30px;
+  height: 30px;
+}
+.pdf-toolbar-modes [aria-pressed="true"] {
+  color: var(--foreground);
+  background: var(--background);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.reading-page.panels-hidden .material-workspace {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.reading-page.panels-hidden
+  :is(.publication-sidebar, .material-info, .publication-splitter) {
+  display: none;
+}
+.reading-page.panels-hidden .material-workspace > .viewer-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+.reading-page.panels-hidden .publication-navigation {
+  display: flex;
+}
+@media (min-width: 801px) {
+  .app-shell:has(.reading-page.panels-hidden) > .sidebar {
+    display: none;
+  }
+}
+.app-shell:has(.reading-page.panels-hidden) > .main-shell {
+  margin-left: 0;
+}
+@media (max-width: 1000px) {
+  .reading-page .material-workspace.with-material-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reading-page .material-workspace.with-publication-tree {
+    grid-template-columns: minmax(0, 1fr) 16px var(
+        --publication-tree-width,
+        240px
+      );
+  }
+  .reading-page .material-workspace > .material-info {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+@media (max-width: 800px) {
+  .publication-splitter {
+    display: none;
+  }
+  .article-reading-position {
+    top: 61px;
+  }
+  .reading-page .material-workspace.with-publication-tree {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reading-page .material-workspace > .publication-sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    position: static;
+    max-height: 45vh;
+    overflow: auto;
+  }
+  .reading-page .material-workspace.with-publication-tree > .viewer-panel {
+    grid-row: 2;
+  }
+  .reading-page .material-workspace > .material-info,
+  .reading-page .material-workspace.with-publication-tree > .material-info {
+    grid-row: 3;
+  }
+  .reading-page .publication-sidebar nav {
+    max-height: none;
+    overflow: visible;
+    margin-top: 0;
+  }
+  .reading-page .reading-article {
+    padding: 24px 20px 36px;
+    font-size: 16px;
+  }
+  .reading-page .text-toolbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .reading-page .text-toolbar .search-box {
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+  .reading-page .text-toolbar input {
+    width: 100%;
+    min-width: 0;
+  }
+  .reading-page .pdf-controls {
+    gap: 7px;
+    padding: 10px 8px;
+  }
+  .reading-page .pdf-with-pages {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .reading-page .reader-full-text .text-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 12px;
+    gap: 8px;
+  }
+  .reader-text-actions {
+    justify-content: flex-end;
+  }
+  .reading-page .reader-controls {
+    padding-inline: 12px;
+  }
+  .reading-page .reader-controls .speed-row {
+    gap: 10px;
+  }
+  .reader-speed {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .reading-page .reader-speed input.speed-slider {
+    width: 80px;
+  }
+  .reading-page .reader-progress-row {
+    gap: 8px;
+    font-size: 10px;
+  }
+  .reading-page .reader-controls .play-button {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+  }
+  .reader-playback .icon-button {
+    width: 28px;
+  }
+}
