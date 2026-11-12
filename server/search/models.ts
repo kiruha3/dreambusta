@@ -141,7 +141,11 @@ export class LocalModels implements Models {
             type: "object",
             properties: {
               text: { type: "string" },
-              sources: { type: "array", items: { type: "integer" } },
+              sources: {
+                type: "array",
+                minItems: 1,
+                items: { type: "integer", enum: sources.map(source => source.number) },
+              },
             },
             required: ["text", "sources"],
             additionalProperties: false,

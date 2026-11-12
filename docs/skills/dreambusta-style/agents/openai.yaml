@@ -1,0 +1,4 @@
+interface:
+  display_name: "Стиль Дримбусты"
+  short_description: "Токены, сетка и компоненты интерфейса Дримбусты"
+  default_prompt: "Используй $dreambusta-style для оформления этого интерфейса в стиле Дримбусты."

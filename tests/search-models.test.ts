@@ -53,6 +53,13 @@ test("local model adapter validates embeddings and asks for structured grounded 
   ]);
   assert.equal(answer.sentences[0].sources[0], 1);
   assert.ok(requests.at(-1).body.format.properties.sentences);
+  const citations = requests.at(-1).body.format.properties.sentences.items.properties.sources;
+  assert.equal(citations.minItems, 1, "every generated claim must cite a supplied source");
+  assert.deepEqual(citations.items.enum, [1], "the grammar must reject invented source numbers");
+  await models.generate("Кто согласует?", [2, 7].map(number => ({
+    number, title: "Договор", context: "Абзац", text: "Договор согласует руководитель.",
+  })));
+  assert.deepEqual(requests.at(-1).body.format.properties.sentences.items.properties.sources.items.enum, [2, 7]);
   assert.equal(requests.at(-1).body.stream, false);
   assert.throws(
     () => new LocalModels({ url: "https://example.com" }),

@@ -1,0 +1,71 @@
+@font-face {
+  font-family: Geist;
+  src: url("./fonts/Geist-Regular.woff2");
+}
+@font-face {
+  font-family: Geist;
+  src: url("./fonts/Geist-Medium.woff2");
+  font-weight: 500;
+}
+@font-face {
+  font-family: Geist;
+  src: url("./fonts/Geist-SemiBold.woff2");
+  font-weight: 600;
+}
+:root {
+  color-scheme: light;
+  --background: #fff;
+  --foreground: #18181b;
+  --primary: #27272a;
+  --primary-foreground: #fff;
+  --card: #fff;
+  --card-foreground: #18181b;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #a1a1aa;
+  --popover: #fff;
+  --popover-foreground: #18181b;
+  --destructive: #b13b40;
+  --radius: 0.65rem;
+  --sidebar: #fafafa;
+  --success: #237352;
+  --success-bg: #edf8f1;
+  --warning: #94611c;
+  --warning-bg: #fff7e8;
+  --danger-bg: #fff1f1;
+}
+.dark {
+  color-scheme: dark;
+  --background: #18181b;
+  --foreground: #fafafa;
+  --primary: #d4d4d8;
+  --primary-foreground: #18181b;
+  --card: #202023;
+  --card-foreground: #fafafa;
+  --secondary: #27272a;
+  --secondary-foreground: #e4e4e7;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #333338;
+  --accent-foreground: #fafafa;
+  --border: #37373d;
+  --input: #45454b;
+  --popover: #202023;
+  --popover-foreground: #fafafa;
+  --sidebar: #202023;
+  --success: #88d2ab;
+  --success-bg: #1e3329;
+  --warning: #e9bd77;
+  --warning-bg: #352d21;
+  --danger-bg: #3c2428;
+  --destructive: #f09ca3;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font: 14px/1.5 Geist, "Segoe UI", sans-serif; }
