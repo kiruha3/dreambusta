@@ -16,6 +16,7 @@ const launcher = ref<HTMLButtonElement>();
 const expanded = ref(false);
 const transitioning = ref(false);
 let animation: Animation | undefined;
+let contentAnimations: Animation[] = [];
 let interruptedFrame: Keyframe | undefined;
 const widgetPosition = ref<{ left: number; top: number } | null>(null);
 let moved = false;
@@ -111,21 +112,43 @@ function morph(element: Element, done: () => void, opening: boolean) {
     transform: current.transform,
     opacity: current.opacity,
     borderRadius: current.borderRadius,
+    backgroundColor: current.backgroundColor,
+    filter: current.filter,
   };
+  const contents = Array.from(node.children, (child) => ({
+    child,
+    opacity: getComputedStyle(child).opacity,
+  }));
   animation?.cancel();
-  const source = launcher.value?.getBoundingClientRect();
+  contentAnimations.forEach((item) => item.cancel());
+  contentAnimations = [];
+  const settled = getComputedStyle(node);
+  const source = launcher.value?.parentElement?.getBoundingClientRect();
   const target = node.getBoundingClientRect();
   const collapsed = {
     transform: source
       ? `translate(${source.right - target.right}px, ${source.bottom - target.bottom}px) scale(${source.width / target.width}, ${source.height / target.height})`
       : "scale(.1)",
-    opacity: 0,
-    borderRadius: "28px",
+    opacity: 1,
+    borderRadius: "50%",
+    backgroundColor: launcher.value
+      ? getComputedStyle(launcher.value).backgroundColor
+      : settled.backgroundColor,
+    filter: "blur(1px)",
+  };
+  const revealed = {
+    transform: "none",
+    opacity: 1,
+    borderRadius: settled.borderRadius,
+    backgroundColor: settled.backgroundColor,
+    filter: "blur(0px)",
   };
   node.inert = !opening;
   if (opening) node.querySelector("textarea")?.focus();
   const finish = () => {
     animation = undefined;
+    contentAnimations.forEach((item) => item.cancel());
+    contentAnimations = [];
     transitioning.value = false;
     done();
     if (!props.isOpen) void nextTick(focusLauncher);
@@ -137,14 +160,29 @@ function morph(element: Element, done: () => void, opening: boolean) {
     finish();
     return;
   }
+  const timing = {
+    duration: opening ? 420 : 260,
+    easing: "cubic-bezier(.2,.8,.2,1)",
+  };
+  contentAnimations = contents.map(({ child, opacity }) =>
+    child.animate(
+      opening
+        ? [
+            { opacity: interrupted ? opacity : 0, filter: "blur(6px)" },
+            { opacity: 0, filter: "blur(6px)", offset: 0.18 },
+            { opacity: 1, filter: "blur(0px)" },
+          ]
+        : [
+            { opacity, filter: "blur(0px)" },
+            { opacity: 0, filter: "blur(6px)", offset: 0.6 },
+            { opacity: 0, filter: "blur(6px)" },
+          ],
+      timing,
+    ),
+  );
   animation = node.animate(
-    opening
-      ? [
-          interrupted || collapsed,
-          { transform: "none", opacity: 1, borderRadius: current.borderRadius },
-        ]
-      : [start, collapsed],
-    { duration: opening ? 300 : 220, easing: "cubic-bezier(.2,.8,.2,1)" },
+    opening ? [interrupted || collapsed, revealed] : [start, collapsed],
+    timing,
   );
   animation.onfinish = finish;
 }
@@ -155,10 +193,14 @@ function cancelMorph(element?: Element) {
       transform: current.transform,
       opacity: current.opacity,
       borderRadius: current.borderRadius,
+      backgroundColor: current.backgroundColor,
+      filter: current.filter,
     };
   }
   animation?.cancel();
   animation = undefined;
+  contentAnimations.forEach((item) => item.cancel());
+  contentAnimations = [];
 }
 onMounted(() => {
   try {

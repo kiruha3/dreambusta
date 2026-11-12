@@ -51,6 +51,7 @@
     }
     let open = false;
     let animation = null;
+    let contentAnimation = null;
     function focusFrame() {
       frame.focus();
       frame.contentWindow.postMessage(
@@ -64,19 +65,27 @@
         transform: current.transform,
         opacity: current.opacity,
         borderRadius: current.borderRadius,
+        backgroundColor: current.backgroundColor,
+        filter: current.filter,
       };
+      const contentOpacity = getComputedStyle(frame).opacity;
       animation?.cancel();
+      contentAnimation?.cancel();
       panel.hidden = false;
       panel.style.display = "block";
       const launcher = button.getBoundingClientRect();
       const bounds = panel.getBoundingClientRect();
       const collapsed = {
         transform: `scale(${launcher.width / bounds.width},${launcher.height / bounds.height})`,
-        opacity: 0,
-        borderRadius: "24px",
+        opacity: 1,
+        borderRadius: `${(24 * bounds.width) / launcher.width}px / ${(24 * bounds.height) / launcher.height}px`,
+        backgroundColor: getComputedStyle(button).backgroundColor,
+        filter: "blur(1px)",
       };
       const finish = () => {
         animation = null;
+        contentAnimation?.cancel();
+        contentAnimation = null;
         if (!open) {
           panel.hidden = true;
           panel.style.display = "none";
@@ -93,11 +102,38 @@
         finish();
         return;
       }
+      const timing = {
+        duration: opening ? 420 : 260,
+        easing: "cubic-bezier(.2,.8,.2,1)",
+      };
+      contentAnimation = frame.animate(
+        opening
+          ? [
+              { opacity: 0, filter: "blur(6px)" },
+              { opacity: 0, filter: "blur(6px)", offset: 0.18 },
+              { opacity: 1, filter: "blur(0px)" },
+            ]
+          : [
+              { opacity: contentOpacity, filter: "blur(0px)" },
+              { opacity: 0, filter: "blur(6px)", offset: 0.6 },
+              { opacity: 0, filter: "blur(6px)" },
+            ],
+        timing,
+      );
       animation = panel.animate(
         opening
-          ? [collapsed, { transform: "none", opacity: 1, borderRadius: "16px" }]
+          ? [
+              collapsed,
+              {
+                transform: "none",
+                opacity: 1,
+                borderRadius: "16px",
+                backgroundColor: "#fff",
+                filter: "blur(0px)",
+              },
+            ]
           : [start, collapsed],
-        { duration: opening ? 300 : 220, easing: "cubic-bezier(.2,.8,.2,1)" },
+        timing,
       );
       animation.onfinish = finish;
     }

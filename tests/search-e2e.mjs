@@ -176,6 +176,47 @@ try {
   await page
     .getByRole("button", { name: "Открыть помощника", exact: true })
     .waitFor();
+  const launcherColor = await page
+    .locator(".chat-master-avatar")
+    .evaluate((node) => getComputedStyle(node).backgroundColor);
+  const openingShape = await page
+    .locator(".chat-master-avatar")
+    .evaluate(async (button) => {
+      button.click();
+      await new Promise(requestAnimationFrame);
+      const node = document.querySelector("#dreambusta-assistant");
+      for (const animation of node.getAnimations({ subtree: true })) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      const style = getComputedStyle(node);
+      return { opacity: style.opacity, background: style.backgroundColor };
+    });
+  assert.equal(
+    openingShape.opacity,
+    "1",
+    "the launcher stays visible as it becomes the chat",
+  );
+  assert.equal(
+    openingShape.background,
+    launcherColor,
+    "the opening shape retains the launcher color",
+  );
+  await page.locator("#dreambusta-assistant").evaluate((node) => {
+    for (const animation of node.getAnimations({ subtree: true }))
+      animation.currentTime = 100;
+  });
+  await page.screenshot({ path: `${artifacts}/assistant-morph.png` });
+  await page.locator("#dreambusta-assistant").evaluate((node) => {
+    for (const animation of node.getAnimations({ subtree: true }))
+      animation.finish();
+  });
+  await page
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .waitFor();
   assert.equal(
     await page
       .getByRole("button", { name: "Поиск по библиотеке", exact: true })

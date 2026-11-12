@@ -105,14 +105,31 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(hostOrigin + "/");
-  await page
-    .getByRole("button", { name: "Открыть помощника Дримбусты" })
-    .click();
+  const launcherColor = await page
+    .getByRole("button")
+    .evaluate((node) => getComputedStyle(node).backgroundColor);
   const launcher = page.locator("button[aria-expanded]");
   const panel = page.getByRole("dialog", { name: "Помощник Дримбусты" });
-  await page.waitForFunction(
-    () => document.querySelector('[role="dialog"]').getAnimations().length > 0,
+  const openingShape = await launcher.evaluate((button) => {
+    button.click();
+    const node = document.querySelector('[role="dialog"]');
+    for (const animation of node.getAnimations({ subtree: true })) {
+      animation.pause();
+      animation.currentTime = 0;
+    }
+    const style = getComputedStyle(node);
+    return { opacity: style.opacity, background: style.backgroundColor };
+  });
+  assert.equal(
+    openingShape.opacity,
+    "1",
+    "the launcher remains visible throughout the morph",
   );
+  assert.equal(openingShape.background, launcherColor);
+  await panel.evaluate((node) => {
+    for (const animation of node.getAnimations({ subtree: true }))
+      animation.play();
+  });
   assert.equal(
     await launcher.isVisible(),
     false,
