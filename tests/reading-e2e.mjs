@@ -208,8 +208,21 @@ try {
   await crumbs.getByText("Инструкция", { exact: true }).waitFor();
   await crumbs.getByRole("link", { name: "Руководство", exact: true }).click();
   await page.locator(".reading-article p").nth(10).waitFor();
+  const articleFillsPanel = () =>
+    page.locator(".reading-article").evaluate((el) => {
+      const viewport = el.getBoundingClientRect();
+      const panel = el.closest(".viewer-panel").getBoundingClientRect();
+      return (
+        Math.abs(viewport.left - panel.left - 1) < 2 &&
+        Math.abs(panel.right - viewport.right - 1) < 2
+      );
+    });
+  assert.ok(
+    await articleFillsPanel(),
+    "article scrollbar sits at the panel edge even with a bounded text column",
+  );
   const narrow = await page
-    .locator(".reading-article")
+    .locator(".article-content")
     .evaluate((el) => el.clientWidth);
   await page.getByLabel("Ширина текста", { exact: true }).selectOption("wide");
   await page
@@ -217,9 +230,13 @@ try {
     .click();
   await page.waitForTimeout(100);
   assert.ok(
-    (await page.locator(".reading-article").evaluate((el) => el.clientWidth)) >
+    (await page.locator(".article-content").evaluate((el) => el.clientWidth)) >
       narrow,
     "wide mode increases available text width",
+  );
+  assert.ok(
+    await articleFillsPanel(),
+    "article viewport stays full width when side panels are hidden",
   );
   assert.equal(
     await page

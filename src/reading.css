@@ -152,16 +152,22 @@
 }
 .reading-page .reading-article {
   width: 100%;
-  max-width: var(--reading-width);
+  max-width: none;
   max-height: none;
   height: 500px;
   min-height: 200px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+.reading-page .article-content {
+  width: 100%;
+  max-width: var(--reading-width);
   margin-inline: auto;
   padding: 28px 34px 42px;
-  line-height: 1.6;
 }
 .reading-page .reading-article :is(p, ul, ol, pre, blockquote) {
   margin-block: 0.5em;
@@ -188,7 +194,7 @@
 .reading-page .reading-article li > :is(ul, ol) {
   margin-block: 0.125em;
 }
-.reading-page .reading-article > div > :first-child {
+.reading-page .article-content > div > :first-child {
   margin-top: 0;
 }
 .reading-page .reading-article table {
@@ -392,8 +398,10 @@
     margin-top: 0;
   }
   .reading-page .reading-article {
-    padding: 24px 20px 36px;
     font-size: 16px;
+  }
+  .reading-page .article-content {
+    padding: 24px 20px 36px;
   }
   .reading-page .text-toolbar {
     gap: 8px;

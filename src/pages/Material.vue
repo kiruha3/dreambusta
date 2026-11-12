@@ -887,12 +887,14 @@ onBeforeUnmount(() => {
             @load.capture="fitArticleViewport"
             @click="articleClick"
           >
-            <PublicationIcon
-              :icon="content?.icon"
-              :material-id="m.id"
-              class="publication-cover-icon"
-            />
-            <div v-html="articleHtml"></div>
+            <div class="article-content">
+              <PublicationIcon
+                :icon="content?.icon"
+                :material-id="m.id"
+                class="publication-cover-icon"
+              />
+              <div v-html="articleHtml"></div>
+            </div>
           </article>
           <PdfViewer
             v-else-if="mode === 'pdf'"
