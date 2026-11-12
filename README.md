@@ -6,6 +6,12 @@
 
 Подробная [инструкция запуска, развёртывания, обновления и резервирования](docs/operations.md).
 
+Короткие команды Windows/Linux: `npm run dev`, `npm run doctor`, `npm run check`,
+`npm run release`. При наличии GNU Make: `make dev`, `make doctor`, `make check`,
+`make release`; полный список — `make help`. Релиз упаковывается с SHA-256 в
+`outputs/` после проверок, библиотека в него не входит. Linux-сервис:
+`make server-status`, `make server-logs`, `make server-restart`, `make backup`.
+
 Требуется **Node.js 24+**. Из этой папки:
 
 ```powershell

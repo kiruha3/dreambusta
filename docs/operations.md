@@ -4,6 +4,49 @@
 Приложение состоит из Vue/Vite, Node API с SQLite и локального Ollama для поиска
 по смыслу и ответов помощника. Теххелпер для запуска не требуется.
 
+## Короткие команды: npm и Makefile
+
+Команды выполняются из корня проекта с Node 24+ в `PATH`. На Windows без `make`
+используйте колонку npm. На Linux установите GNU Make (`sudo apt install make`
+в Ubuntu/Debian) и используйте любую колонку.
+
+| Make           | npm                        | Действие                                              |
+| -------------- | -------------------------- | ----------------------------------------------------- |
+| `make help`    | `npm run ops:help`         | Список команд                                         |
+| `make install` | `npm ci`                   | Зависимости для разработки                            |
+| `make dev`     | `npm run dev`              | API + Vite, остановка через Ctrl+C                    |
+| `make doctor`  | `npm run doctor`           | Проверка локального интерфейса, API, поиска и моделей |
+| `make check`   | `npm run check`            | Unit/HTTP, typecheck, сборка                          |
+| `make verify`  | `npm run verify`           | check + браузерные E2E                                |
+| `make release` | `npm run release`          | verify + архив релиза и файл SHA-256                  |
+| `make pack`    | `npm run release:pack`     | Только упаковка уже проверенного dist/                |
+| `make live`    | `npm run test:search:live` | Проверка настоящих моделей                            |
+
+`make models` скачивает обе модели Ollama. `make test`, `make typecheck`,
+`make build`, `make e2e`, `make api`, `make preview` запускают отдельные этапы.
+Перед E2E один раз выполните `npx playwright install chromium`.
+Проверка настоящей модели вынесена в `live`, поэтому обычный релиз не требует
+Ollama. Любой неуспешный обязательный этап прерывает release до упаковки.
+Команды не отправляют релиз на сервер и не заменяют библиотеку.
+
+На Linux-сервере из `/opt/dreambusta/current` доступны отдельные команды
+(запрашивают sudo, если запущены не root):
+
+| Make                  | npm                      | Действие                                       |
+| --------------------- | ------------------------ | ---------------------------------------------- |
+| `make server-status`  | `npm run server:status`  | Состояние dreambusta.service                   |
+| `make server-logs`    | `npm run server:logs`    | Последние 100 строк журнала                    |
+| `make server-restart` | `npm run server:restart` | Перезапуск только DreamBusta                   |
+| `make backup`         | `npm run backup`         | Копия /var/lib/dreambusta с остановкой сервиса |
+
+Backup сохраняется в `/var/backups/dreambusta/` с SHA-256 и закрытыми правами.
+Если сервис работал, он запускается снова и после успешного копирования, и при
+ошибке архивации. Изначально остановленный сервис остаётся остановленным.
+Эти команды применимы после установки unit по инструкции ниже. Сервер не требует
+Vite: вместо `doctor` с dev-портами проверяйте HTTPS и API командами из диагностики.
+Архив релиза содержит серверные файлы и команды обслуживания, но не полный
+checkout для разработки: для `dev` нужны исходники проекта.
+
 ## Локальный запуск на Windows
 
 Нужны Node.js **24+**, npm и установленные зависимости. В PowerShell:
@@ -119,13 +162,13 @@ npm run test:search:live # отдельно: нужны запущенный Oll
 временные библиотеки. В релиз входят готовый `dist/` и серверные исходники:
 
 ```powershell
-New-Item -ItemType Directory -Force outputs | Out-Null
-$taskRelease = Get-Date -Format 'yyyyMMdd-HHmmss'
-$taskArchive = "outputs/dreambusta-$taskRelease.tgz"
-tar.exe -czf $taskArchive dist server shared lib vendor deploy/dreambusta package.json package-lock.json
-tar.exe -tzf $taskArchive | Select-Object -First 15
-Get-FileHash $taskArchive -Algorithm SHA256
+npm run release:pack
 ```
+
+На Windows и Linux для упаковки нужен `tar` в PATH (Windows 10/11 включает его).
+Архив и соседний `.sha256` создаются в игнорируемом `outputs/`. Упаковщик использует
+явный список серверных файлов; `Makefile`, команды обслуживания и инструкция
+также включены. Без `dist/index.html` упаковка завершается ошибкой.
 
 Не включайте `data/`, `.env`, `.git`, `node_modules/` или сессии. Зависимости
 устанавливаются на целевой ОС. Передайте архив и его SHA-256 оператору сервера;

@@ -14,7 +14,17 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "vue-tsc --noEmit",
     "test:e2e": "node tests/e2e.mjs && node tests/search-e2e.mjs",
-    "test:search:live": "node tests/search-live.mjs"
+    "test:search:live": "node tests/search-live.mjs",
+    "ops:help": "node scripts/tasks.mjs help",
+    "doctor": "node scripts/tasks.mjs doctor",
+    "check": "node scripts/tasks.mjs check",
+    "verify": "node scripts/tasks.mjs verify",
+    "release": "node scripts/tasks.mjs release",
+    "release:pack": "node scripts/tasks.mjs pack",
+    "server:status": "node scripts/tasks.mjs server-status",
+    "server:logs": "node scripts/tasks.mjs server-logs",
+    "server:restart": "node scripts/tasks.mjs server-restart",
+    "backup": "node scripts/tasks.mjs backup"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
