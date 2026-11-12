@@ -58,6 +58,7 @@ export class SearchService {
   store: Store;
   private stopped = false;
   private controller = new AbortController();
+  private generation = 0;
   private worker?: Promise<void>;
   private timer?: ReturnType<typeof setTimeout>;
   private unsubscribe: () => void;
@@ -76,6 +77,16 @@ export class SearchService {
     this.unsubscribe = store.subscribe(() => this.schedule());
     this.ready = this.index.sync().then(() => this.backfill());
     void this.ready.then(() => this.schedule()).catch(() => this.schedule());
+  }
+  reconfigure(models: Models) {
+    this.generation++;
+    this.controller.abort();
+    this.controller = new AbortController();
+    this.models = models;
+    this.queryCache.clear();
+    this.cooldown = 0;
+    // A worker may still be unwinding an aborted embedding request.
+    void (this.worker || Promise.resolve()).finally(() => this.schedule());
   }
   private schedule(delay = 10) {
     if (this.stopped) return;
@@ -132,24 +143,32 @@ export class SearchService {
     }
   }
   private async run() {
+    const generation = this.generation;
+    const models = this.models;
+    const controller = this.controller;
     await this.ready;
     await this.index.sync();
-    if (!this.models.enabled || this.cooldown > Date.now() || this.stopped)
+    if (
+      !models.enabled ||
+      this.cooldown > Date.now() ||
+      this.stopped ||
+      generation !== this.generation
+    )
       return;
     try {
-      while (!this.stopped) {
+      while (!this.stopped && generation === this.generation) {
         await this.index.sync();
         const rows = this.store.db
           .prepare(
             "SELECT id,fingerprint,data FROM search_chunks WHERE (vector IS NULL OR model IS NULL OR model<>?) AND embedding_after<=? LIMIT 8",
           )
-          .all(this.models.embeddingModel, Date.now());
+          .all(models.embeddingModel, Date.now());
         if (!rows.length) {
           const retry = this.store.db
             .prepare(
               "SELECT MIN(embedding_after) AS at FROM search_chunks WHERE vector IS NULL OR model IS NULL OR model<>?",
             )
-            .get(this.models.embeddingModel)?.at;
+            .get(models.embeddingModel)?.at;
           if (typeof retry === "number" && retry > Date.now())
             this.schedule(Math.max(1000, retry - Date.now()));
           break;
@@ -163,7 +182,7 @@ export class SearchService {
         );
         let vectors: (number[] | null)[];
         try {
-          vectors = await this.models.embed(inputs, this.controller.signal);
+          vectors = await models.embed(inputs, controller.signal);
         } catch (error) {
           if (
             ![400, 413, 422].includes(
@@ -175,9 +194,7 @@ export class SearchService {
           for (let i = 0; i < inputs.length; i++) {
             try {
               vectors.push(
-                (
-                  await this.models.embed([inputs[i]], this.controller.signal)
-                )[0],
+                (await models.embed([inputs[i]], controller.signal))[0],
               );
             } catch (singleError) {
               if (
@@ -190,8 +207,9 @@ export class SearchService {
             }
           }
         }
-        if (this.stopped) return;
+        if (this.stopped || generation !== this.generation) return;
         await this.index.sync();
+        if (this.stopped || generation !== this.generation) return;
         const update = this.store.db.prepare(
           "UPDATE search_chunks SET vector=?,model=? WHERE id=? AND fingerprint=?",
         );
@@ -208,7 +226,7 @@ export class SearchService {
             }
             update.run(
               packVector(vectors[i]),
-              this.models.embeddingModel,
+              models.embeddingModel,
               row.id,
               row.fingerprint,
             );
@@ -223,7 +241,7 @@ export class SearchService {
       }
       this.cooldown = 0;
     } catch {
-      if (!this.stopped) {
+      if (!this.stopped && generation === this.generation) {
         this.cooldown = Date.now() + 60000;
         this.schedule(60000);
       }
@@ -267,6 +285,9 @@ export class SearchService {
     editor: boolean,
     signal?: AbortSignal,
   ): Promise<SearchResponse> {
+    const generation = this.generation;
+    const models = this.models;
+    const controller = this.controller;
     await this.ready;
     await this.index.sync();
     if (!queryTerms(options.query).length)
@@ -275,27 +296,30 @@ export class SearchService {
     let combined = lexical;
     let mode: SearchResponse["mode"] = "lexical";
     const allowed = this.index.allowed(options, editor);
-    const rows = this.models.enabled
-      ? this.store.db
-          .prepare(
-            "SELECT id,material_id,vector FROM search_chunks WHERE vector IS NOT NULL AND model=?",
-          )
-          .all(this.models.embeddingModel)
-          .filter((row) => allowed.has(row.material_id as string))
-      : [];
+    const rows =
+      models.enabled && generation === this.generation
+        ? this.store.db
+            .prepare(
+              "SELECT id,material_id,vector FROM search_chunks WHERE vector IS NOT NULL AND model=?",
+            )
+            .all(models.embeddingModel)
+            .filter((row) => allowed.has(row.material_id as string))
+        : [];
     if (rows.length) {
       try {
         const key = options.query.trim();
         let cached = this.queryCache.get(key);
         if (!cached || cached.at < Date.now() - 300000) {
-          const [vector] = await this.models.embed(
+          const [vector] = await models.embed(
             [`task: search result | query: ${key}`],
             AbortSignal.any([
-              this.controller.signal,
+              controller.signal,
               AbortSignal.timeout(8000),
               ...(signal ? [signal] : []),
             ]),
           );
+          if (generation !== this.generation)
+            throw new Error("Настройки моделей изменились");
           cached = { at: Date.now(), vector };
           if (this.queryCache.size >= 100)
             this.queryCache.delete(this.queryCache.keys().next().value!);
@@ -341,6 +365,9 @@ export class SearchService {
     editor: () => boolean,
     signal?: AbortSignal,
   ): Promise<SearchAnswer> {
+    const generation = this.generation;
+    const models = this.models;
+    const controller = this.controller;
     const found = await this.search(
       { ...options, offset: 0, limit: 30 },
       editor(),
@@ -384,11 +411,15 @@ export class SearchService {
     if (!this.isCurrent(chunks, options, editor()))
       return empty("changed", "Источники изменились. Повторите поиск.");
     try {
-      const generated = await this.models.generate(
+      if (generation !== this.generation || !models.enabled)
+        throw new Error("Настройки моделей изменились");
+      const generated = await models.generate(
         options.query,
         sources,
-        AbortSignal.any([this.controller.signal, ...(signal ? [signal] : [])]),
+        AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
       );
+      if (generation !== this.generation)
+        throw new Error("Настройки моделей изменились");
       if (!this.isCurrent(chunks, options, editor()))
         return empty(
           "changed",

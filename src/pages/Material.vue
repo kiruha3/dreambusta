@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths as appPaths } from "../lib/paths";
 import {
   ref,
   computed,
@@ -197,7 +198,7 @@ async function loadMaterial() {
     favorite.value = favorites().includes(loaded.id);
     if (route.params.slug !== loaded.slug) {
       await router.replace({
-        path: `/library/${loaded.slug}`,
+        path: appPaths.material(loaded.slug),
         query: route.query,
         hash: route.hash,
       });
@@ -308,7 +309,7 @@ watch(article, (element) => {
 });
 const pagePath = (slug?: string) =>
   withContext(
-    `/library/${m.value!.slug}${slug ? `?page=${encodeURIComponent(slug)}` : ""}`,
+    `${appPaths.material(m.value!.slug)}${slug ? `?page=${encodeURIComponent(slug)}` : ""}`,
     verifiedContext.value,
   );
 let contextLoad = 0;
@@ -445,7 +446,7 @@ const articleHtml = computed(() => {
       const target = new URL(href, m.value.source.url || location.href);
       const path = paths.get(sourceKey(target.href));
       if (path) {
-        link.setAttribute("href", path + target.hash);
+        link.setAttribute("href", appPaths.public(path) + target.hash);
         link.target = "_self";
       }
     } catch {}
@@ -483,7 +484,7 @@ function articleClick(event: MouseEvent) {
   const target = new URL(link.href);
   if (
     target.origin !== location.origin ||
-    target.pathname !== `/library/${m.value!.slug}`
+    target.pathname !== appPaths.public(appPaths.material(m.value!.slug))
   )
     return;
   event.preventDefault();
@@ -495,7 +496,9 @@ function articleClick(event: MouseEvent) {
     target.hash === route.hash
   )
     scrollToFragment(target.hash);
-  void router.push(target.pathname + target.search + target.hash);
+  void router.push(
+    appPaths.internal(target.pathname + target.search + target.hash),
+  );
 }
 const articlePercent = ref(0);
 const articlePositionKey = computed(() =>
@@ -635,7 +638,7 @@ onBeforeUnmount(() => {
       :page-path="pagePath"
       :page-missing="pageMissing"
     />
-    <RouterLink v-else class="back-link" to="/library"
+    <RouterLink v-else class="back-link" :to="appPaths.catalog"
       ><Icon name="back" />Все материалы</RouterLink
     >
     <div v-if="error" class="empty panel">

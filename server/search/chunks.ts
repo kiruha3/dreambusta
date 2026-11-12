@@ -1,3 +1,4 @@
+import { createPaths } from "../../shared/paths.ts";
 import { createHash } from "node:crypto";
 import type { Material } from "../../shared/types.ts";
 import type { SearchLocation, SearchResult } from "../../shared/search.ts";
@@ -212,7 +213,10 @@ export function resultFor(
         ? chunk.context.replace(/Абзац \d+$/, `Абзац ${l.paragraph + 1}`)
         : chunk.context,
     snippet: snippet || m.description || m.title,
-    url: `/library/${m.slug}${params.size ? "?" + params : ""}`,
+    url:
+      createPaths(process.env.DREAMBUSTA_BASE_PATH).public(
+        createPaths(process.env.DREAMBUSTA_BASE_PATH).material(m.slug),
+      ) + (params.size ? "?" + params : ""),
     location: l,
     textVersion: m.textVersion,
   };

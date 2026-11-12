@@ -24,6 +24,7 @@ import { readTrustedSourceOrigins } from "./sources/config.ts";
 import { SearchService } from "./search/service.ts";
 import type { Models } from "./search/models.ts";
 import { LocalModels } from "./search/models.ts";
+import { ModelManagement, ModelManagementError } from "./search/management.ts";
 import type { SearchQuery } from "../shared/search.ts";
 import { createWidgetHandler } from "./widgets.ts";
 
@@ -111,6 +112,10 @@ export function createApp({
         : searchModels,
     dataDir,
   });
+  const modelManagement =
+    search.models instanceof LocalModels
+      ? new ModelManagement(store, search, search.models)
+      : undefined;
   const answerAttempts = new Map<string, { since: number; count: number }>();
   const handleWidget = createWidgetHandler({ store, search });
   let activeAnswers = 0;
@@ -238,6 +243,43 @@ export function createApp({
           );
       } else if (closed && !editor)
         throw new HttpError(401, "Библиотека доступна после входа");
+      if (parts[1] === "ai") {
+        if (!editor) throw new HttpError(401, "Войдите как редактор");
+        if (!modelManagement)
+          throw new HttpError(
+            503,
+            "Управление Ollama недоступно для внешнего адаптера моделей",
+          );
+        if (parts.length === 2 && method === "GET")
+          return json(res, 200, await modelManagement.status());
+        if (parts.length === 3 && parts[2] === "settings" && method === "PATCH")
+          return json(
+            res,
+            200,
+            await modelManagement.configure(await readJson(req)),
+          );
+        if (parts.length === 3 && parts[2] === "pull" && method === "POST")
+          return json(
+            res,
+            202,
+            modelManagement.startPull((await readJson(req)).model),
+          );
+        if (parts.length === 3 && parts[2] === "pull" && method === "DELETE")
+          return json(res, 200, modelManagement.cancelPull());
+        if (parts.length === 3 && parts[2] === "unload" && method === "POST") {
+          await modelManagement.unload((await readJson(req)).model);
+          return json(res, 200, { ok: true });
+        }
+        if (
+          parts.length === 3 &&
+          parts[2] === "models" &&
+          method === "DELETE"
+        ) {
+          await modelManagement.delete((await readJson(req)).model);
+          return json(res, 200, { ok: true });
+        }
+        throw new HttpError(404, "Не найдено");
+      }
       if (parts[1] === "search" && (method === "GET" || searchAnswer)) {
         const raw = searchAnswer
           ? await readJson(req)
@@ -595,7 +637,7 @@ export function createApp({
         err instanceof MaterialConflictError ||
           err instanceof DuplicateMaterialError
           ? 409
-          : err instanceof HttpError
+          : err instanceof HttpError || err instanceof ModelManagementError
             ? err.status
             : /не найден/i.test(message)
               ? 404
@@ -605,7 +647,8 @@ export function createApp({
     }
   });
   server.on("close", () => {
+    modelManagement?.close();
     void search.close();
   });
-  return { server, store, search };
+  return { server, store, search, modelManagement };
 }

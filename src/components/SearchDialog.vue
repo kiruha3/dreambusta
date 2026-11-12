@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import {
   ref,
   computed,
@@ -36,7 +37,7 @@ let timer: ReturnType<typeof setTimeout>;
 let controller: AbortController | undefined;
 let previousFocus: HTMLElement | null = null;
 const currentMaterial = computed(() =>
-  route.path.startsWith("/library/") ? String(route.params.slug || "") : "",
+  route.name === "material" ? String(route.params.slug || "") : "",
 );
 function params(offset = 0) {
   const p = new URLSearchParams({
@@ -139,7 +140,7 @@ async function choose(result: SearchResult) {
   close();
   await router.push(
     withContext(
-      result.url,
+      paths.internal(result.url),
       scope.value.startsWith("collection:")
         ? { from: "collection", collection: scope.value.slice(11) }
         : route.query,

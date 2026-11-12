@@ -13,7 +13,7 @@ const dir = mkdtempSync(join(tmpdir(), "dreambusta-widget-browser-"));
 const store = new Store(dir);
 const search = new SearchService(store, {
   models: {
-    enabled: false,
+    enabled: true,
     embeddingModel: "test",
     embed: async () => [],
     generate: async () => ({
@@ -108,6 +108,44 @@ try {
   await page
     .getByRole("button", { name: "Открыть помощника Дримбусты" })
     .click();
+  const launcher = page.locator("button[aria-expanded]");
+  const panel = page.getByRole("dialog", { name: "Помощник Дримбусты" });
+  await page.waitForFunction(
+    () => document.querySelector('[role="dialog"]').getAnimations().length > 0,
+  );
+  assert.equal(
+    await launcher.isVisible(),
+    false,
+    "launcher disappears during the morph",
+  );
+  assert.equal(await launcher.getAttribute("tabindex"), "-1");
+  assert.equal(
+    await page.getByRole("button").count(),
+    0,
+    "only the iframe header closes the open assistant",
+  );
+  await page.evaluate(
+    ({ widget, base, hostOrigin }) => {
+      const childWindow = document.querySelector("iframe").contentWindow;
+      for (const [source, origin] of [
+        [window, base],
+        [childWindow, hostOrigin],
+      ])
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            source,
+            origin,
+            data: { type: "dreambusta:close", widget },
+          }),
+        );
+    },
+    { widget: widget.id, base, hostOrigin },
+  );
+  assert.equal(
+    await launcher.getAttribute("aria-expanded"),
+    "true",
+    "foreign message sources and origins cannot close the panel",
+  );
   const frame = page.frameLocator("iframe");
   await frame.getByLabel("Ваш вопрос").fill("договор");
   await frame.getByRole("button", { name: "Спросить" }).click();
@@ -137,12 +175,49 @@ try {
       .getAttribute("aria-expanded"),
     "false",
   );
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await launcher.evaluate((node) => node === document.activeElement),
+    true,
+  );
+  await launcher.press("Enter");
+  await frame.getByLabel("Ваш вопрос").waitFor();
+  await frame.getByLabel("Ваш вопрос").focus();
+  await page.keyboard.press("Escape");
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await panel.isVisible(),
+    false,
+    "Escape during opening finishes a clean close",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await launcher.press("Enter");
+  await frame.getByLabel("Ваш вопрос").waitFor();
+  assert.equal(await panel.evaluate((node) => node.getAnimations().length), 0);
+  await frame.getByLabel("Ваш вопрос").focus();
+  await page.keyboard.press("Escape");
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await launcher.evaluate((node) => node === document.activeElement),
+    true,
+    "reduced-motion close restores keyboard focus",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(hostOrigin + "/inline");
   await page
     .frameLocator("#inline iframe")
     .getByLabel("Ваш вопрос")
     .fill("договор");
   assert.equal(await page.locator("#inline iframe").count(), 1);
+  await page
+    .frameLocator("#inline iframe")
+    .getByRole("button", { name: "Закрыть помощника" })
+    .click();
+  assert.equal(
+    await page.locator("#inline iframe").isVisible(),
+    true,
+    "inline embeds remain in place",
+  );
   await page.goto(hostOrigin + "/manual");
   const child = page.frames().find((f) => f.url().includes("/embed/"));
   await child.waitForSelector("#query");

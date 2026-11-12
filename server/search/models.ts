@@ -74,6 +74,7 @@ export class LocalModels implements Models {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
       signal: combined,
+      redirect: "error",
     });
     if (!res.ok) {
       await res.body?.cancel();
@@ -105,7 +106,7 @@ export class LocalModels implements Models {
         model: this.embeddingModel,
         input: texts,
         truncate: false,
-        keep_alive: "10m",
+        keep_alive: "2m",
       },
       signal,
     );
@@ -157,7 +158,7 @@ export class LocalModels implements Models {
         stream: false,
         think: false,
         format: schema,
-        keep_alive: "10m",
+        keep_alive: "2m",
         options: { temperature: 0, num_ctx: 8192, num_predict: 900 },
         messages: [
           {

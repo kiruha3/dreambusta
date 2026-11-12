@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../../lib/paths";
 import {
   ref,
   shallowRef,
@@ -79,7 +80,10 @@ async function load() {
   links?.setDocument(null);
   await task?.destroy();
   if (gen !== generation) return;
-  const assets = new URL(`/pdfjs/${pdfjs.version}/`, window.location.href).href;
+  const assets = new URL(
+    paths.public(`/pdfjs/${pdfjs.version}/`),
+    window.location.href,
+  ).href;
   task = pdfjs.getDocument({
     url: props.src,
     isEvalSupported: false,

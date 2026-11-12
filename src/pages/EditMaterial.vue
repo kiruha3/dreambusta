@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { Material } from "../../shared/types";
@@ -161,11 +162,13 @@ async function copy() {
   if (!m.value) return;
   try {
     await navigator.clipboard.writeText(
-      `${location.origin}/library/${m.value.slug}`,
+      `${location.origin}${paths.public(paths.material(m.value.slug))}`,
     );
     notify("Ссылка скопирована");
   } catch {
-    notify("Ссылка: " + location.origin + "/library/" + m.value.slug);
+    notify(
+      "Ссылка: " + location.origin + paths.public(paths.material(m.value.slug)),
+    );
   }
 }
 </script>
@@ -182,7 +185,7 @@ async function copy() {
         <p>Обновлён {{ date(m.updatedAt) }}</p>
       </div>
       <div class="row wrap">
-        <RouterLink class="button" :to="`/library/${m.slug}`"
+        <RouterLink class="button" :to="paths.material(m.slug)"
           ><Icon name="external" />Открыть</RouterLink
         ><button class="button primary" :disabled="busy">
           {{ busy ? "Сохраняем…" : "Сохранить" }}
@@ -212,7 +215,7 @@ async function copy() {
           <label class="field"
             >Адрес материала
             <div class="slug-input">
-              <span>/library/</span
+              <span>{{ paths.public(paths.material("")) }}</span
               ><input
                 v-model="m.slug"
                 required

@@ -1,3 +1,4 @@
+import { paths } from "./lib/paths";
 import { reactive, ref } from "vue";
 import type { Session, Material } from "../shared/types.ts";
 export const session = reactive<Session>({
@@ -32,7 +33,7 @@ export async function api<T = any>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(paths.public(`/api${path}`), {
     ...init,
     headers: {
       ...(init.body && typeof init.body === "string"
@@ -63,7 +64,9 @@ export async function loadSession() {
   Object.assign(session, await api<Session>("/session"));
 }
 export function fileUrl(id: string, key = "original") {
-  return `/api/materials/${encodeURIComponent(id)}/file/${encodeURIComponent(key)}`;
+  return paths.public(
+    `/api/materials/${encodeURIComponent(id)}/file/${encodeURIComponent(key)}`,
+  );
 }
 export function uploadFile(
   file: File,
@@ -74,7 +77,9 @@ export function uploadFile(
     const xhr = new XMLHttpRequest();
     xhr.open(
       "POST",
-      `/api/${id ? `materials/${id}/version` : "uploads"}?name=${encodeURIComponent(file.name)}`,
+      paths.public(
+        `/api/${id ? `materials/${id}/version` : "uploads"}?name=${encodeURIComponent(file.name)}`,
+      ),
     );
     if (session.csrf) xhr.setRequestHeader("X-CSRF-Token", session.csrf);
     xhr.upload.onprogress = (e) => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import { computed, ref, onMounted, onBeforeUnmount, toRaw } from "vue";
 import type { Widget, WidgetState } from "../../shared/widgets";
 import type { Material } from "../../shared/types";
@@ -25,7 +26,7 @@ const unavailableIds = computed(
       (id) => !materials.value.some((m) => m.id === id),
     ) || [],
 );
-const base = location.origin;
+const base = location.origin + paths.base;
 const preview = ref<HTMLIFrameElement>();
 function previewReady(event: MessageEvent) {
   const widget = current.value;
@@ -33,7 +34,7 @@ function previewReady(event: MessageEvent) {
   if (
     !widget ||
     !frame ||
-    event.origin !== base ||
+    event.origin !== location.origin ||
     event.source !== frame.contentWindow ||
     event.data?.type !== "dreambusta:ready" ||
     event.data.widget !== widget.id
@@ -41,7 +42,7 @@ function previewReady(event: MessageEvent) {
     return;
   frame.contentWindow?.postMessage(
     { type: "dreambusta:context", widget: widget.id },
-    base,
+    location.origin,
   );
 }
 onMounted(() => window.addEventListener("message", previewReady));
@@ -313,7 +314,7 @@ async function copy() {
             ref="preview"
             :key="`${current.id}-${saved.revision}`"
             class="widget-preview"
-            :src="`/embed/${current.id}`"
+            :src="paths.public(`/embed/${current.id}`)"
             title="Предпросмотр внешнего помощника"
           ></iframe
         ></template>

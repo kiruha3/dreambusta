@@ -25,7 +25,7 @@ export function pdfjsAssets(): Plugin {
       return { code: `@scope (.pdf-workspace) {\n${code.replaceAll(":root", ":scope")}\n}`, map: null };
     },
     configureServer(server) {
-      server.middlewares.use(`/${prefix}`, (req, res) => {
+      server.middlewares.use(`${server.config.base}${prefix}`, (req, res) => {
         const name = (req.url || "").split("?")[0].replace(/^\//, "");
         const path = assets.get(name);
         if (!path) { res.statusCode = 404; res.end(); return; }

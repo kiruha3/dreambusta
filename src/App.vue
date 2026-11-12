@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "./lib/paths";
 import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
@@ -19,16 +20,16 @@ const menu = ref(false);
 const headerQuery = ref("");
 const dark = ref(localStorage.getItem("dreambusta-theme") === "dark");
 const section = computed(() => {
-  if (route.path.startsWith("/library/")) return materialSection.value;
+  if (route.name === "material") return materialSection.value;
   if (route.path.startsWith("/collections")) return "collection";
   if (route.path === "/knowledge") return "knowledge";
-  if (route.path === "/library") return route.query.view || "all";
+  if (route.path === paths.catalog) return route.query.view || "all";
   return "";
 });
 const pinnedActive = computed(
   () =>
     section.value === "all" &&
-    sidebarMaterials.value.some((m) => route.path === `/library/${m.slug}`),
+    sidebarMaterials.value.some((m) => route.path === paths.material(m.slug)),
 );
 watch(
   dark,
@@ -53,20 +54,20 @@ watch(
 async function logout() {
   await send("/logout", "POST", {});
   await loadSession();
-  location.assign("/library");
+  location.assign(paths.public(paths.catalog));
 }
 </script>
 <template>
   <div class="app-shell">
     <aside class="sidebar" :class="{ open: menu }">
-      <RouterLink class="brand" to="/library"
+      <RouterLink class="brand" :to="paths.catalog"
         ><span class="brand-logo"><Icon name="library" :size="23" /></span
         >DreamBusta</RouterLink
       >
       <span class="eyebrow sidebar-label">БИБЛИОТЕКА</span>
       <nav aria-label="Библиотека">
         <RouterLink
-          to="/library"
+          :to="paths.catalog"
           :class="{ active: section === 'all' && !pinnedActive }"
           ><Icon name="library" />Все материалы</RouterLink
         >
@@ -79,12 +80,12 @@ async function logout() {
           ><Icon name="collections" />Подборки</RouterLink
         >
         <RouterLink
-          to="/library?view=continue"
+          :to="paths.catalog + '?view=continue'"
           :class="{ active: section === 'continue' }"
           ><Icon name="book" />Продолжить чтение</RouterLink
         >
         <RouterLink
-          to="/library?view=favorites"
+          :to="paths.catalog + '?view=favorites'"
           :class="{ active: section === 'favorites' }"
           ><Icon name="heart" />Избранное</RouterLink
         >
@@ -115,6 +116,11 @@ async function logout() {
             :class="{ active: route.path === '/admin/settings' }"
             ><Icon name="settings" />Настройки</RouterLink
           >
+          <RouterLink
+            to="/admin/ai"
+            :class="{ active: route.path === '/admin/ai' }"
+            ><Icon name="settings" />Локальные модели</RouterLink
+          >
         </nav>
       </template>
       <template v-if="sidebarMaterials.length">
@@ -123,9 +129,9 @@ async function logout() {
           <RouterLink
             v-for="m in sidebarMaterials"
             :key="m.id"
-            :to="`/library/${m.slug}`"
+            :to="paths.material(m.slug)"
             :class="{
-              active: pinnedActive && route.path === `/library/${m.slug}`,
+              active: pinnedActive && route.path === paths.material(m.slug),
             }"
             ><Icon name="book" /><span>{{ m.title }}</span></RouterLink
           >

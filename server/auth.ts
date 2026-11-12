@@ -1,3 +1,4 @@
+import { createPaths } from "../shared/paths.ts";
 import {
   randomBytes,
   scryptSync,
@@ -43,7 +44,7 @@ export function login(
     .run(digest(token), email, csrf, Date.now() + 7 * 86400000);
   res.setHeader(
     "Set-Cookie",
-    `db_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${process.env.SECURE_COOKIE === "1" || "encrypted" in req.socket ? "; Secure" : ""}`,
+    `db_session=${token}; HttpOnly; SameSite=Strict; Path=${createPaths(process.env.DREAMBUSTA_BASE_PATH).base || "/"}; Max-Age=604800${process.env.SECURE_COOKIE === "1" || "encrypted" in req.socket ? "; Secure" : ""}`,
   );
   return {
     editor: true,
@@ -65,6 +66,6 @@ export function logout(
     store.db.prepare("DELETE FROM sessions WHERE token=?").run(digest(token));
   res.setHeader(
     "Set-Cookie",
-    "db_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+    `db_session=; HttpOnly; SameSite=Strict; Path=${createPaths(process.env.DREAMBUSTA_BASE_PATH).base || "/"}; Max-Age=0`,
   );
 }

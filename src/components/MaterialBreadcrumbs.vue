@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import { computed } from "vue";
 import type { Collection, Material, PublicationPage } from "../../shared/types";
 const props = defineProps<{
@@ -13,7 +14,7 @@ const props = defineProps<{
 const parents = computed(() => {
   if (props.collection)
     return [
-      { title: "Все материалы", path: "/library" },
+      { title: "Все материалы", path: paths.catalog },
       { title: "Подборки", path: "/collections" },
       {
         title: props.collection.title,
@@ -23,10 +24,10 @@ const parents = computed(() => {
   if (props.context.from === "knowledge")
     return [{ title: "База знаний", path: "/knowledge" }];
   if (props.context.from === "favorites")
-    return [{ title: "Избранное", path: "/library?view=favorites" }];
+    return [{ title: "Избранное", path: paths.catalog + "?view=favorites" }];
   if (props.context.from === "continue")
-    return [{ title: "Продолжить чтение", path: "/library?view=continue" }];
-  return [{ title: "Все материалы", path: "/library" }];
+    return [{ title: "Продолжить чтение", path: paths.catalog + "?view=continue" }];
+  return [{ title: "Все материалы", path: paths.catalog }];
 });
 </script>
 <template>

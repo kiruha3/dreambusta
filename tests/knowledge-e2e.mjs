@@ -152,6 +152,7 @@ try {
     book.title,
     doc.title,
   ]);
+  await guestPage.locator(".material-card").first().waitFor();
   assert.equal(await guestPage.locator(".material-card").count(), 1);
   await page.goto(base + `/admin/materials/${book.id}`);
   await page.getByLabel("Включить в базу знаний").check();

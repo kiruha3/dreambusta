@@ -1,12 +1,17 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { paths } from "./lib/paths";
 import { loadSession, session } from "./api";
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: "/", redirect: "/library" },
-    { path: "/library", component: () => import("./pages/Catalog.vue") },
+    ...(paths.base ? [] : [{ path: "/", redirect: "/library" }]),
+    { path: paths.catalog, component: () => import("./pages/Catalog.vue") },
     { path: "/knowledge", component: () => import("./pages/Catalog.vue") },
-    { path: "/library/:slug", component: () => import("./pages/Material.vue") },
+    {
+      path: paths.base ? "/materials/:slug" : "/library/:slug",
+      name: "material",
+      component: () => import("./pages/Material.vue"),
+    },
     {
       path: "/collections",
       component: () => import("./pages/Collections.vue"),
@@ -18,6 +23,7 @@ export const router = createRouter({
     { path: "/login", component: () => import("./pages/Login.vue") },
     { path: "/admin", component: () => import("./pages/Admin.vue") },
     { path: "/admin/widgets", component: () => import("./pages/Widgets.vue") },
+    { path: "/admin/ai", component: () => import("./pages/Models.vue") },
     {
       path: "/admin/materials",
       component: () => import("./pages/AdminMaterials.vue"),

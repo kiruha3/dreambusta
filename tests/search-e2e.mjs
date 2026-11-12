@@ -205,6 +205,19 @@ try {
     name: "Помощник по библиотеке",
   });
   await assistant.waitFor();
+  const assistantLauncher = page.locator(".chat-master-avatar");
+  assert.equal(
+    await assistantLauncher.isVisible(),
+    false,
+    "open assistant replaces the launcher",
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Закрыть помощника", exact: true })
+      .count(),
+    1,
+    "only the upper-right X closes the assistant",
+  );
   await assistant
     .getByText("Договор согласует руководитель отдела.", { exact: false })
     .first()
@@ -569,6 +582,43 @@ try {
     name: "Открыть помощника",
     exact: true,
   });
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await launcher.evaluate((node) => node === document.activeElement),
+    true,
+    "closing restores keyboard focus",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await launcher.press("Enter");
+  await assistant.waitFor();
+  assert.equal(
+    await assistant.evaluate((node) => node.getAnimations().length),
+    0,
+  );
+  await page.keyboard.press("Escape");
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await assistant.isVisible(),
+    false,
+    "Escape closes without motion",
+  );
+  assert.equal(
+    await launcher.evaluate((node) => node === document.activeElement),
+    true,
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await launcher.press("Enter");
+  await page.waitForFunction(
+    () =>
+      document.querySelector(".chat-popup-window")?.getAnimations().length > 0,
+  );
+  await page.keyboard.press("Escape");
+  await launcher.waitFor({ state: "visible" });
+  assert.equal(
+    await assistant.isVisible(),
+    false,
+    "Escape can reverse the opening morph",
+  );
   const launchBox = await launcher.boundingBox();
   await page.mouse.move(launchBox.x + 25, launchBox.y + 25);
   await page.mouse.down();

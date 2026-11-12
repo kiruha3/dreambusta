@@ -10,7 +10,8 @@
     tokenUntil = 0,
     parentOrigin = "",
     connecting = null,
-    controller = null;
+    controller = null,
+    focusRequested = false;
   function status(text) {
     $("status").textContent = text;
   }
@@ -35,7 +36,9 @@
         }
         if (
           url.origin !== location.origin ||
-          !url.pathname.startsWith("/library/")
+          !url.pathname.startsWith(
+            config.basePath ? config.basePath + "/materials/" : "/library/",
+          )
         )
           continue;
         const li = document.createElement("li"),
@@ -54,7 +57,10 @@
   }
   async function api(path, payload, signal) {
     const response = await fetch(
-      "/api/public/widgets/" + encodeURIComponent(config.id) + path,
+      (config.basePath || "") +
+        "/api/public/widgets/" +
+        encodeURIComponent(config.id) +
+        path,
       {
         method: "POST",
         credentials: "omit",
@@ -85,6 +91,7 @@
       $("query").disabled = false;
       $("ask").disabled = false;
       status("");
+      if (focusRequested) $("query").focus();
     });
     try {
       await connecting;
@@ -93,6 +100,7 @@
     }
   }
   const close = () => {
+    focusRequested = false;
     controller?.abort();
     if (parent !== window && parentOrigin)
       parent.postMessage(
@@ -110,7 +118,7 @@
       if (
         event.source !== window.parent ||
         !event.data ||
-        event.data.type !== "dreambusta:context" ||
+        !["dreambusta:context", "dreambusta:focus"].includes(event.data.type) ||
         event.data.widget !== config.id ||
         !(
           event.origin === location.origin ||
@@ -120,6 +128,13 @@
         return;
       // The parent cannot change identities after the first accepted handshake.
       if (parentOrigin && parentOrigin !== event.origin) return;
+      if (event.data.type === "dreambusta:focus") {
+        if (!parentOrigin) return;
+        focusRequested = true;
+        if (!$("query").disabled) $("query").focus();
+        else $("close").focus();
+        return;
+      }
       parentOrigin = event.origin;
       connect().catch((e) => status(e.message));
     });

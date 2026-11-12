@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { MessageCircle, Send, Square } from "lucide-vue-next";
@@ -40,7 +41,7 @@ let contextGeneration = 0;
 let controller: AbortController | undefined;
 const disabled = computed(() => session.closed && !session.editor);
 const currentMaterial = computed(() =>
-  route.path.startsWith("/library/") ? String(route.params.slug || "") : "",
+  route.name === "material" ? String(route.params.slug || "") : "",
 );
 const selectedScope = computed(() =>
   scope.value === "current"
@@ -145,7 +146,7 @@ function enter(event: KeyboardEvent) {
 }
 async function choose(source: SearchResult) {
   close();
-  await router.push(source.url);
+  await router.push(paths.internal(source.url));
 }
 watch([assistantOpen, assistantRequest], async ([open, requestOptions]) => {
   const generation = ++contextGeneration;

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { createPaths } from "../shared/paths.ts";
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -37,6 +38,7 @@ function pack() {
     "deploy/dreambusta",
     "scripts/tasks.mjs",
     "docs/operations.md",
+    "docs/deploy-lore.md",
     "README.md",
     "Makefile",
     "package.json",
@@ -66,8 +68,12 @@ function pack() {
   );
 }
 async function doctor() {
+  const paths = createPaths(process.env.DREAMBUSTA_BASE_PATH);
   const checks = [
-    ["Интерфейс", `http://127.0.0.1:${process.env.WEB_PORT || 5173}/library`],
+    [
+      "Интерфейс",
+      `http://127.0.0.1:${process.env.WEB_PORT || 5173}${paths.public(paths.catalog)}`,
+    ],
     ["API", `http://127.0.0.1:${process.env.API_PORT || 5176}/api/session`],
     [
       "Поиск",
@@ -117,7 +123,10 @@ try {
   if (Number(process.versions.node.split(".")[0]) < 24)
     throw new Error("Нужен Node.js 24+.");
   const command = process.argv[2] || "help";
-  if (command === "check") {
+  if (command === "build-library") {
+    process.env.DREAMBUSTA_BASE_PATH = "/library";
+    npm("build");
+  } else if (command === "check") {
     for (const script of ["test", "typecheck", "build"]) npm(script);
   } else if (command === "verify" || command === "release") {
     npm("check");
@@ -144,6 +153,7 @@ try {
   } else if (command === "help") {
     console.log(`DreamBusta — Node 24+, команды из каталога проекта:
   npm run dev          запуск API + Vite; Ctrl+C — остановка
+  npm run build:library сборка для academy.dreamdocs.ru/library/
   npm run doctor       доступность интерфейса, API, поиска, моделей
   npm run check        unit/HTTP + typecheck + build
   npm run verify       check + браузерные E2E

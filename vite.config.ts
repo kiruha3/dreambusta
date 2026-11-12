@@ -5,6 +5,19 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { resolve, relative, isAbsolute, sep } from "node:path";
 import { pdfjsAssets } from "./scripts/pdfjs-assets";
+import { createPaths } from "./shared/paths";
+const mountPath = createPaths(process.env.DREAMBUSTA_BASE_PATH).base;
+const apiRoutes = () =>
+  Object.fromEntries(
+    ["/api", "/embed"].map((path) => [
+      mountPath + path,
+      {
+        ...apiProxy,
+        rewrite: (path: string) =>
+          mountPath ? path.slice(mountPath.length) : path,
+      },
+    ]),
+  );
 const privateStorage = resolve(process.env.DATA_DIR || "data").replaceAll(
   "\\",
   "/",
@@ -29,6 +42,7 @@ const apiProxy: ProxyOptions = {
   },
 };
 export default defineConfig({
+  base: mountPath + "/",
   plugins: [
     pdfjsAssets(),
     vue(),
@@ -72,18 +86,12 @@ export default defineConfig({
         `${privateStorage}/**`,
       ],
     },
-    proxy: {
-      "/api": apiProxy,
-      "/embed": apiProxy,
-    },
+    proxy: apiRoutes(),
   },
   preview: {
     host: "0.0.0.0",
     port: Number(process.env.WEB_PORT || 5173),
-    proxy: {
-      "/api": apiProxy,
-      "/embed": apiProxy,
-    },
+    proxy: apiRoutes(),
   },
   esbuild: { jsx: "automatic" },
 });

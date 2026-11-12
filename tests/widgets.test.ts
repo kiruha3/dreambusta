@@ -304,7 +304,7 @@ test("trusted loopback proxy separates forwarded clients' concurrency budgets ac
     three = new Promise<void>((r) => (resolveThree = r)),
     blocked = new Promise<void>((r) => (release = r));
   const models: Models = {
-    enabled: false,
+    enabled: true,
     embeddingModel: "test",
     embed: async () => [],
     generate: async () => {
@@ -380,7 +380,7 @@ test("public sessions enforce publish, exact parent origin and closed library ev
 test("anonymous answers include only selected visible sources and ignore arbitrary prompt/scope/editor cookies", async (t) => {
   let supplied: unknown;
   const models: Models = {
-    enabled: false,
+    enabled: true,
     embeddingModel: "test",
     embed: async () => [],
     generate: async (_q, sources) => {
@@ -439,7 +439,7 @@ test("anonymous answers include only selected visible sources and ignore arbitra
 test("empty widget selection includes all public ready snapshots and excludes hidden, processing and removed materials", async (t) => {
   let supplied = "";
   const models: Models = {
-    enabled: false,
+    enabled: true,
     embeddingModel: "test",
     embed: async () => [],
     generate: async (_query, sources) => {
@@ -518,7 +518,7 @@ for (const revoke of [
     const entered = new Promise<void>((r) => (started = r)),
       blocked = new Promise<void>((r) => (finish = r));
     const models: Models = {
-      enabled: false,
+      enabled: true,
       embeddingModel: "test",
       embed: async () => [],
       generate: async () => {
@@ -656,7 +656,7 @@ test("public answers bound concurrency and propagate cancellation to the model",
     release!: () => void;
   const blocked = new Promise<void>((r) => (release = r));
   const models: Models = {
-    enabled: false,
+    enabled: true,
     embeddingModel: "test",
     embed: async () => [],
     generate: async (_query, _sources, signal) => {

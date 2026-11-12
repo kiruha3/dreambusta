@@ -10,7 +10,7 @@
 
 # Current DreamBusta workspace (supersedes historical WBook launch notes above)
 
-- This folder is an independent nested Git repository on feat/vue-library, no remote. Do not turn it into a parent-repository gitlink/submodule.
+- This folder is an independent nested Git repository on feat/vue-library, tracking origin/main at https://github.com/kiruha3/dreambusta.git. Do not turn it into a parent-repository gitlink/submodule.
 - Active app: Vue 3 in src/, Node 24 API in server/, SQLite/files in ignored data/. Historical React/Cloudflare sources are inactive and preserved by baseline b5fb240.
 - Local launch: npm run dev, frontend 5173 with --host 0.0.0.0 and API 5176. On 2026-11-11 the user explicitly authorized deploying DreamBusta to 45.9.12.136, preserving everything already there. Keep it separate from WBook: /opt/dreambusta, /var/lib/dreambusta, dreambusta.service and its own Nginx vhost. Do not reuse any Academy credentials.
 - Preserve the original WBook checkout and its private library. Do not commit data/, .env, generated design exports, browser artifacts or node_modules.

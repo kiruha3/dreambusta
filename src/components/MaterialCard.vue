@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import type { Material } from "../../shared/types";
 import Icon from "./Icon.vue";
 import { kindNames, fileUrl } from "../api";
@@ -12,7 +13,7 @@ defineProps<{
 <template>
   <RouterLink
     class="material-card"
-    :to="withContext(`/library/${material.slug}`, context || {})"
+    :to="withContext(paths.material(material.slug), context || {})"
   >
     <div class="card-art" :class="`art-${material.kind}`">
       <img

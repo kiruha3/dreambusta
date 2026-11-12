@@ -1,7 +1,7 @@
 NPM ?= npm
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help install dev api build preview test typecheck check verify e2e live doctor release pack models server-status server-logs server-restart backup
+.PHONY: help install dev api build build-library preview test typecheck check verify e2e live doctor release pack models server-status server-logs server-restart backup
 
 help:
 	$(NPM) run ops:help
@@ -13,6 +13,8 @@ api:
 	$(NPM) run api
 build:
 	$(NPM) run build
+build-library:
+	$(NPM) run build:library
 preview:
 	$(NPM) run preview
 test:

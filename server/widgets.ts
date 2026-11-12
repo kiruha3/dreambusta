@@ -5,6 +5,7 @@ import { isIP } from "node:net";
 import type { Store } from "./store.ts";
 import type { SearchService } from "./search/service.ts";
 import type { Widget } from "../shared/widgets.ts";
+import { createPaths } from "../shared/paths.ts";
 import { getSession } from "./auth.ts";
 
 class WidgetError extends Error {
@@ -339,6 +340,7 @@ export function createWidgetHandler({
           `default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' ${widget.allowedOrigins.join(" ")}`,
         );
         const config = JSON.stringify({
+          basePath: createPaths(process.env.DREAMBUSTA_BASE_PATH).base,
           id: widget.id,
           title: widget.title,
           greeting: widget.greeting,
@@ -347,7 +349,7 @@ export function createWidgetHandler({
         }).replace(/</g, "\\u003c");
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Помощник Дримбусты</title><link rel="stylesheet" href="/embed-assets/widget.css"></head><body><main class="shell"><header><h1 id="title"></h1><button id="close" type="button" aria-label="Закрыть помощника">×</button></header><div id="messages" role="log" aria-live="polite"></div><p id="status" role="status">Подключение помощника…</p><form id="question"><label class="sr-only" for="query">Ваш вопрос</label><textarea id="query" placeholder="Задайте вопрос по базе знаний…" rows="2" maxlength="2000" required disabled></textarea><button id="ask" type="submit" disabled>Спросить</button><button id="cancel" type="button" hidden>Отменить</button></form><footer>Источники — открытые материалы Дримбусты</footer></main><script id="widget-config" type="application/json">${config}</script><script src="/embed-assets/widget.js" defer></script></body></html>`,
+          `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Помощник Дримбусты</title><link rel="stylesheet" href="${createPaths(process.env.DREAMBUSTA_BASE_PATH).base}/embed-assets/widget.css"></head><body><main class="shell"><header><h1 id="title"></h1><button id="close" type="button" aria-label="Закрыть помощника">×</button></header><div id="messages" role="log" aria-live="polite"></div><p id="status" role="status">Подключение помощника…</p><form id="question"><label class="sr-only" for="query">Ваш вопрос</label><textarea id="query" placeholder="Задайте вопрос по базе знаний…" rows="2" maxlength="2000" required disabled></textarea><button id="ask" type="submit" disabled>Спросить</button><button id="cancel" type="button" hidden>Отменить</button></form><footer>Источники — открытые материалы Дримбусты</footer></main><script id="widget-config" type="application/json">${config}</script><script src="${createPaths(process.env.DREAMBUSTA_BASE_PATH).base}/embed-assets/widget.js" defer></script></body></html>`,
         );
         return true;
       }

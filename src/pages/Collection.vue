@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { paths } from "../lib/paths";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { Collection, Material } from "../../shared/types";
@@ -30,7 +31,7 @@ const error = ref("");
   >
   <div v-if="error" class="empty panel">
     <h1>{{ error }}</h1>
-    <RouterLink to="/library">Открыть библиотеку</RouterLink>
+    <RouterLink :to="paths.catalog">Открыть библиотеку</RouterLink>
   </div>
   <template v-if="c"
     ><div class="page-heading">

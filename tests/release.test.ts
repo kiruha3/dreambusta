@@ -27,6 +27,7 @@ function fixture(t: any) {
     "deploy/dreambusta/dreambusta.service",
     "scripts/tasks.mjs",
     "docs/operations.md",
+    "docs/deploy-lore.md",
     "README.md",
     "package.json",
     "package-lock.json",
@@ -59,6 +60,7 @@ test("release archive includes runtime and operations but excludes private libra
   assert.match(listing.stdout, /dist\/index.html/);
   assert.match(listing.stdout, /deploy\/dreambusta\/dreambusta.service/);
   assert.match(listing.stdout, /scripts\/tasks.mjs/);
+  assert.match(listing.stdout, /docs\/deploy-lore.md/);
   assert.doesNotMatch(
     listing.stdout,
     /(?:^|\n)(?:data\/|\.env|\.git\/|node_modules\/)/,
