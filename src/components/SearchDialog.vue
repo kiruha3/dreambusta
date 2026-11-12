@@ -10,10 +10,11 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { api, kindNames, session } from "../api";
 import { searchOpen } from "../composables/search";
+import { openAssistant } from "../composables/assistant";
 import type { Collection } from "../../shared/types";
 import type {
   SearchResponse,
-  SearchAnswer,
+  SearchQuery,
   SearchResult,
 } from "../../shared/search";
 import Icon from "./Icon.vue";
@@ -26,15 +27,12 @@ const kind = ref("");
 const scope = ref("");
 const collections = ref<Collection[]>([]);
 const response = ref<SearchResponse>();
-const answer = ref<SearchAnswer>();
 const busy = ref(false);
-const answering = ref(false);
 const error = ref("");
 const selected = ref(0);
 let generation = 0;
 let timer: ReturnType<typeof setTimeout>;
 let controller: AbortController | undefined;
-let answerController: AbortController | undefined;
 let previousFocus: HTMLElement | null = null;
 const currentMaterial = computed(() =>
   route.path.startsWith("/library/") ? String(route.params.slug || "") : "",
@@ -55,9 +53,7 @@ function cancel() {
   generation++;
   clearTimeout(timer);
   controller?.abort();
-  answerController?.abort();
   busy.value = false;
-  answering.value = false;
 }
 function close() {
   cancel();
@@ -66,7 +62,6 @@ function close() {
   nextTick(() => previousFocus?.isConnected && previousFocus.focus());
 }
 async function search(append = false) {
-  if (!append) answer.value = undefined;
   controller?.abort();
   const request = ++generation;
   controller = new AbortController();
@@ -92,7 +87,6 @@ async function search(append = false) {
 }
 function changed() {
   cancel();
-  answer.value = undefined;
   response.value = undefined;
   error.value = "";
   selected.value = 0;
@@ -108,7 +102,6 @@ watch(searchOpen, async (open) => {
     return;
   }
   previousFocus = document.activeElement as HTMLElement;
-  answer.value = undefined;
   response.value = undefined;
   error.value = "";
   await nextTick();
@@ -126,36 +119,19 @@ watch(
   () => {
     cancel();
     response.value = undefined;
-    answer.value = undefined;
     if (searchOpen.value) void search();
   },
 );
-async function ask() {
-  if (answering.value || busy.value || !response.value?.results.length) return;
-  answerController?.abort();
-  answerController = new AbortController();
-  const request = generation;
-  answering.value = true;
-  answer.value = undefined;
-  const body = Object.fromEntries(params());
-  try {
-    const value = await api<SearchAnswer>("/search/answer", {
-      method: "POST",
-      body: JSON.stringify({ ...body, query: query.value.trim() }),
-      signal: answerController.signal,
-    });
-    if (request === generation && searchOpen.value) answer.value = value;
-  } catch (e) {
-    if (request === generation && !answerController.signal.aborted)
-      answer.value = {
-        status: "unavailable",
-        answer: "",
-        sources: [],
-        message: (e as Error).message,
-      };
-  } finally {
-    if (request === generation) answering.value = false;
-  }
+function ask() {
+  if (busy.value || !query.value.trim()) return;
+  const options: SearchQuery = { query: query.value.trim() };
+  if (kind.value) options.kind = kind.value as SearchQuery["kind"];
+  if (scope.value === "current" && currentMaterial.value)
+    options.material = currentMaterial.value;
+  if (scope.value.startsWith("collection:"))
+    options.collection = scope.value.slice(11);
+  close();
+  openAssistant(options);
 }
 async function choose(result: SearchResult) {
   close();
@@ -320,38 +296,12 @@ onBeforeUnmount(() => {
               >
             </div>
             <div v-if="response.results.length" class="library-search-ai">
-              <button class="button" :disabled="answering || busy" @click="ask">
-                {{
-                  answering
-                    ? "Готовим ответ по источникам…"
-                    : "Спросить по найденному"
-                }}</button
+              <button class="button" :disabled="busy" @click="ask">
+                Спросить помощника</button
               ><span class="muted small-text"
                 >Ответ со ссылками на материалы</span
               >
             </div>
-            <section
-              v-if="answer || answering"
-              class="library-search-answer"
-              aria-label="Ответ по источникам"
-              aria-live="polite"
-            >
-              <p v-if="answering">Читаем найденные фрагменты…</p>
-              <template v-else-if="answer?.status === 'answered'"
-                ><h3>Ответ по источникам</h3>
-                <p class="library-answer-text">{{ answer.answer }}</p>
-                <button
-                  v-for="source in answer.sources"
-                  :key="source.number"
-                  class="library-source-link"
-                  @click="choose(source)"
-                >
-                  [{{ source.number }}] {{ source.title }} ·
-                  {{ source.context }}
-                </button></template
-              >
-              <p v-else>{{ answer?.message }}</p>
-            </section>
             <div v-if="!response.results.length" class="library-search-empty">
               <p>Ничего не найдено</p>
               <span>Попробуйте другие слова или измените область поиска.</span>

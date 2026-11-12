@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { session, send, loadSession, ui } from "./api";
 import Icon from "./components/Icon.vue";
 import SearchDialog from "./components/SearchDialog.vue";
+import AssistantWidget from "./components/AssistantWidget.vue";
 import { openSearch } from "./composables/search";
 const route = useRoute();
 const admin = computed(() => route.path.startsWith("/admin"));
@@ -150,5 +151,6 @@ async function logout() {
       <Icon name="check" />{{ ui.notice }}
     </div>
     <SearchDialog />
+    <AssistantWidget />
   </div>
 </template>

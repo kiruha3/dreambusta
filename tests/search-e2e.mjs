@@ -97,10 +97,22 @@ const slides = store.createMaterial({
   },
 });
 store.close();
+let onHeldAnswer;
+let releaseHeldAnswer;
 const model = createServer(async (req, res) => {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const b = JSON.parse(Buffer.concat(chunks).toString());
+  if (
+    req.url === "/api/chat" &&
+    JSON.parse(b.messages.at(-1).content).question ===
+      "Удержанныйвопрос договор"
+  ) {
+    await new Promise((resolve) => {
+      releaseHeldAnswer = resolve;
+      onHeldAnswer?.();
+    });
+  }
   res.setHeader("Content-Type", "application/json");
   res.end(
     JSON.stringify(
@@ -158,6 +170,16 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base + "/library");
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Поиск по библиотеке", exact: true })
+      .count(),
+    1,
+    "top search remains available",
+  );
   await page.evaluate(
     (id) =>
       localStorage.setItem(
@@ -174,12 +196,35 @@ try {
   await dialog.getByRole("option").filter({ hasText: "Практика" }).waitFor();
   assert.ok(!(await dialog.innerText()).includes("Секретный материал"));
   await dialog
-    .getByRole("button", { name: "Спросить по найденному", exact: true })
+    .getByRole("button", { name: "Спросить помощника", exact: true })
     .click();
-  await dialog
+  const assistant = page.getByRole("dialog", {
+    name: "Помощник по библиотеке",
+  });
+  await assistant.waitFor();
+  await assistant
     .getByText("Договор согласует руководитель отдела.", { exact: false })
     .first()
     .waitFor();
+  assert.equal(await dialog.isVisible(), false, "handoff closes search");
+  await assistant
+    .locator(".library-source-link")
+    .filter({ hasText: book.title })
+    .first()
+    .click();
+  await page.waitForURL(/paragraph=25/);
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .click();
+  assert.ok(
+    (await assistant.innerText()).includes("Целевойфрагмент"),
+    "history survives closing and source navigation",
+  );
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  await page.keyboard.press("Control+k");
+  await dialog.getByRole("option").filter({ hasText: "Практика" }).waitFor();
   await input.press("Enter");
   await page.waitForURL(/paragraph=25/);
   await page
@@ -286,7 +331,173 @@ try {
     .waitFor();
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .click();
+  await assistant.waitFor();
+  await assistant
+    .getByRole("button", { name: "Новый диалог", exact: true })
+    .click();
+  assert.equal(await assistant.locator(".assistant-turn").count(), 0);
+  const question = assistant.getByRole("textbox", { name: "Вопрос помощнику" });
+  await assistant
+    .getByLabel("Искать ответ в")
+    .selectOption("collection:" + collection.slug);
+  await question.fill("Кто согласует договор?");
+  await question.press("Enter");
+  await assistant
+    .getByText("Договор согласует руководитель отдела.", { exact: false })
+    .first()
+    .waitFor();
+  assert.ok((await assistant.innerText()).includes("Рабочие книги"));
+  assert.ok(!(await assistant.innerText()).includes("Секретный материал"));
+  await assistant
+    .getByRole("button", { name: "Новый диалог", exact: true })
+    .click();
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  await page.keyboard.press("Control+k");
+  await input.fill("Целевойфрагмент");
+  await dialog.getByLabel("Тип материала").selectOption("");
+  await dialog
+    .getByRole("option")
+    .filter({ hasText: book.title })
+    .first()
+    .waitFor();
+  let releaseCollections, collectionsStarted;
+  let collectionGate = new Promise((resolve) => {
+    releaseCollections = resolve;
+  });
+  let collectionStart = new Promise((resolve) => {
+    collectionsStarted = resolve;
+  });
+  let heldCollections = false;
+  await page.route("**/api/collections", async (route) => {
+    if (!heldCollections) {
+      heldCollections = true;
+      collectionsStarted();
+      await collectionGate;
+    }
+    await route.continue();
+  });
+  await dialog
+    .getByRole("button", { name: "Спросить помощника", exact: true })
+    .click();
+  await collectionStart;
+  await page
+    .getByRole("button", { name: "Поиск по библиотеке", exact: true })
+    .click();
+  await input.fill("Кто согласует договор?");
+  await dialog
+    .getByRole("option")
+    .filter({ hasText: book.title })
+    .first()
+    .waitFor();
+  await dialog
+    .getByRole("button", { name: "Спросить помощника", exact: true })
+    .click();
+  await assistant
+    .getByText("Договор согласует руководитель отдела.", { exact: false })
+    .first()
+    .waitFor();
+  releaseCollections();
+  await page.waitForTimeout(200);
+  assert.deepEqual(
+    await assistant.locator(".assistant-question").allTextContents(),
+    ["Кто согласует договор?"],
+    "old handoff must not replace or append to a newer question",
+  );
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  await page.keyboard.press("Control+k");
+  await dialog
+    .getByRole("option")
+    .filter({ hasText: book.title })
+    .first()
+    .waitFor();
+  heldCollections = false;
+  collectionGate = new Promise((resolve) => {
+    releaseCollections = resolve;
+  });
+  collectionStart = new Promise((resolve) => {
+    collectionsStarted = resolve;
+  });
+  await dialog
+    .getByRole("button", { name: "Спросить помощника", exact: true })
+    .click();
+  await collectionStart;
+  await assistant
+    .getByRole("button", { name: "Новый диалог", exact: true })
+    .click();
+  releaseCollections();
+  await page.waitForTimeout(200);
+  assert.equal(
+    await assistant.locator(".assistant-turn").count(),
+    0,
+    "new dialog invalidates an unfinished search handoff",
+  );
+  await page.unroute("**/api/collections");
+  await assistant
+    .getByRole("button", { name: "Новый диалог", exact: true })
+    .click();
+  const held = new Promise((resolve) => {
+    onHeldAnswer = resolve;
+  });
+  await question.fill("Удержанныйвопрос договор");
+  await question.press("Enter");
+  let heldTimeout;
+  await Promise.race([
+    held,
+    new Promise((_, reject) => {
+      heldTimeout = setTimeout(
+        () => reject(new Error("Held question did not reach model")),
+        10000,
+      );
+    }),
+  ]).finally(() => clearTimeout(heldTimeout));
+  await assistant
+    .getByRole("button", { name: "Остановить ответ", exact: true })
+    .click();
+  await assistant
+    .getByText("Ответ остановлен. Можно повторить вопрос.", { exact: true })
+    .waitFor();
+  await assistant
+    .getByRole("button", { name: "Новый диалог", exact: true })
+    .click();
+  releaseHeldAnswer();
+  await page.waitForTimeout(150);
+  assert.equal(
+    await assistant.locator(".assistant-turn").count(),
+    0,
+    "late cancelled response must not restore cleared history",
+  );
+  await assistant
+    .getByRole("button", { name: "Развернуть помощника", exact: true })
+    .click();
+  assert.ok(
+    await assistant.evaluate((el) => el.getBoundingClientRect().width > 450),
+  );
+  await assistant
+    .getByRole("button", { name: "Свернуть помощника", exact: true })
+    .click();
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .click();
+  assert.ok(
+    await assistant.evaluate(
+      (el) => el.getBoundingClientRect().width <= innerWidth,
+    ),
+  );
+  await page.screenshot({ path: artifacts + "/assistant-mobile.png" });
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
   await page.keyboard.press("Control+k");
   await input.fill("<img src=x onerror=alert(1)>");
   await page.waitForTimeout(350);
@@ -313,15 +524,82 @@ try {
       { exact: true },
     )
     .waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .click();
+  await assistant.getByLabel("Искать ответ в").selectOption("current");
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  await page.locator("a.brand").click();
+  await page.waitForURL(base + "/library");
+  await page
+    .getByRole("button", { name: "Открыть помощника", exact: true })
+    .click();
+  assert.equal(
+    await assistant.getByLabel("Искать ответ в").inputValue(),
+    "",
+    "current-material scope resets when leaving the material",
+  );
+  await assistant
+    .getByRole("textbox", { name: "Вопрос помощнику" })
+    .fill("Кто согласует договор?");
+  await assistant
+    .getByRole("button", { name: "Отправить вопрос", exact: true })
+    .click();
+  await assistant
+    .locator(".assistant-turn")
+    .last()
+    .getByText("Договор согласует руководитель отдела.", { exact: false })
+    .waitFor();
+  assert.equal(
+    await assistant.locator(".assistant-turn-scope").last().innerText(),
+    "Вся библиотека",
+    "scope label must agree with the actual fallback scope",
+  );
+  await page.screenshot({ path: artifacts + "/assistant-desktop.png" });
+  await assistant
+    .getByRole("button", { name: "Закрыть помощника", exact: true })
+    .click();
+  const launcher = page.getByRole("button", {
+    name: "Открыть помощника",
+    exact: true,
+  });
+  const launchBox = await launcher.boundingBox();
+  await page.mouse.move(launchBox.x + 25, launchBox.y + 25);
+  await page.mouse.down();
+  await page.mouse.move(launchBox.x - 175, launchBox.y - 125, { steps: 8 });
+  await page.mouse.up();
+  assert.equal(
+    await assistant.isVisible(),
+    false,
+    "drag must not toggle the chat",
+  );
+  const movedBox = await launcher.boundingBox();
+  assert.ok(
+    movedBox.x < launchBox.x - 100 && movedBox.y < launchBox.y - 80,
+    "borrowed launcher drag moves the widget",
+  );
+  assert.ok(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("dreambusta:assistant-widget-position"))
+          .left > 0,
+    ),
+  );
+  await launcher.press("Enter");
+  await assistant.waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: global search, keyboard, grounded answer, hidden sources, paragraph/publication/PDF/slide links, collection scope, mobile, escaping and stale version.",
+    "PASS: top search, TechHelper widget handoff/direct questions/history/sources, cancellation/new-dialog races, scopes, drag/expand/mobile, safe text and versioned source links.",
   );
 } catch (e) {
   if (page)
     await page.screenshot({ path: artifacts + "/failure.png" }).catch(() => {});
   throw e;
 } finally {
+  releaseHeldAnswer?.();
   if (browser) await browser.close();
   await Promise.all(
     children.map(
