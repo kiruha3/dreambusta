@@ -300,3 +300,46 @@ test("large vector indexes use compact binary storage and still retrieve by mean
   assert.equal(found.mode, "hybrid");
   assert.equal(found.results[0].materialId, doc.id);
 });
+
+test("an unanswered question retains readable related sources and discards them after access changes", async (t) => {
+  const client = models();
+  let hide = () => {};
+  client.generate = async () => {
+    hide();
+    return { sentences: [] };
+  };
+  const { store, service } = await setup(t, client);
+  const doc = store.createMaterial({
+    title: "Инструкция",
+    kind: "document",
+    source: { type: "file" },
+    paragraphs: ["Согласует задачу назначенный участник проекта."],
+  });
+  store.createMaterial({
+    title: "Скрытый",
+    kind: "document",
+    visible: false,
+    source: { type: "file" },
+    paragraphs: ["Согласование выполняет секретный участник."],
+  });
+  await service.idle();
+  const answer = await service.answer(
+    { query: "Кто согласует договор?" },
+    () => false,
+  );
+  assert.equal(answer.status, "no-sources");
+  assert.equal(answer.answer, "");
+  assert.deepEqual(
+    answer.sources.map((s) => s.materialId),
+    [doc.id],
+  );
+  hide = () => {
+    store.updateMaterial(doc.id, { visible: false });
+  };
+  const changed = await service.answer(
+    { query: "Кто согласует договор?" },
+    () => false,
+  );
+  assert.equal(changed.status, "changed");
+  assert.equal(changed.sources.length, 0);
+});

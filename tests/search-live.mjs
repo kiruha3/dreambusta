@@ -1,5 +1,5 @@
 // Explicit opt-in smoke: own local models, temporary library, no TH or production data.
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
@@ -62,6 +62,33 @@ try {
   assert.match(response.answer, /руководител/i);
   assert.match(response.answer, /тр[её]х|3/i);
   assert.ok(response.sources.length);
+  const documentation = JSON.parse(
+    readFileSync(
+      new URL("./fixtures/approval-docs.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const documented = await models.generate(
+    documentation.question,
+    documentation.sources,
+  );
+  assert.ok(
+    documented.sentences.length,
+    "documented permission/role must produce an answer, not an empty refusal",
+  );
+  assert.match(
+    documented.sentences.map((s) => s.text).join(" "),
+    /соглас|право/i,
+  );
+  const unknown = await models.generate(
+    "Какова дата рождения директора ООО «Несуществующая организация»?",
+    documentation.sources,
+  );
+  assert.equal(
+    unknown.sentences.length,
+    0,
+    "unavailable personal facts must not be inferred from role documentation",
+  );
   console.log(
     JSON.stringify(
       {

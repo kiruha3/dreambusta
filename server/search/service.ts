@@ -5,6 +5,7 @@ import type {
   SearchQuery,
   SearchAnswer,
   SearchResponse,
+  AnswerSource,
 } from "../../shared/search.ts";
 import { SearchIndex } from "./index.ts";
 import { LocalModels, type Models, type ModelSource } from "./models.ts";
@@ -347,7 +348,7 @@ export class SearchService {
     );
     const chunks: SearchChunk[] = [];
     const sources: ModelSource[] = [];
-    const results = [];
+    const results: AnswerSource[] = [];
     for (const result of found.results) {
       const chunk = this.index.chunk(result.id);
       if (!chunk || chunk.metadata) continue;
@@ -364,7 +365,17 @@ export class SearchService {
     const empty = (
       status: SearchAnswer["status"],
       message: string,
-    ): SearchAnswer => ({ status, answer: "", sources: [], message });
+      related = false,
+    ): SearchAnswer => {
+      if (related && !this.isCurrent(chunks, options, editor()))
+        return {
+          status: "changed",
+          answer: "",
+          sources: [],
+          message: "Источники изменились. Повторите вопрос.",
+        };
+      return { status, answer: "", sources: related ? results : [], message };
+    };
     if (!chunks.length)
       return empty(
         "no-sources",
@@ -392,7 +403,8 @@ export class SearchService {
       if (!generated.sentences.length)
         return empty(
           "no-sources",
-          "Найденные фрагменты не содержат достаточно сведений для ответа.",
+          "Не нашёл подтверждённого ответа. Уточните вопрос или выберите конкретный материал. Ниже — близкие по теме фрагменты.",
+          true,
         );
       const used = new Set<number>();
       const lines = generated.sentences.map((s) => {
@@ -423,6 +435,7 @@ export class SearchService {
       return empty(
         "unavailable",
         "Локальная модель не смогла подготовить ответ. Найденные материалы доступны ниже — можно повторить запрос.",
+        true,
       );
     }
   }

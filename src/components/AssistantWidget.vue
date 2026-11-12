@@ -267,6 +267,12 @@ onBeforeUnmount(cancel);
           <p v-if="turn.pending" role="status">Ищу и читаю источники…</p>
           <template v-else-if="turn.answer?.status === 'answered'"
             ><p class="library-answer-text">{{ turn.answer.answer }}</p>
+          </template>
+          <p v-else>{{ turn.error || turn.answer?.message }}</p>
+          <div v-if="!turn.pending && turn.answer?.sources.length">
+            <small v-if="turn.answer.status !== 'answered'" class="muted"
+              >Близкие по теме материалы</small
+            >
             <button
               v-for="source in turn.answer.sources"
               :key="source.number"
@@ -275,8 +281,7 @@ onBeforeUnmount(cancel);
             >
               [{{ source.number }}] {{ source.title }} · {{ source.context }}
             </button>
-          </template>
-          <p v-else>{{ turn.error || turn.answer?.message }}</p>
+          </div>
           <button
             v-if="
               !turn.pending &&

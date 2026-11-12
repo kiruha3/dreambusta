@@ -167,15 +167,16 @@ export class LocalModels implements Models {
           },
           {
             role: "user",
+            // Numbered prose avoids false empty answers observed with JSON input.
             // Keep paragraph boundaries without repeated blank lines, which small
             // local models can misread as the end of a quoted source.
-            content: JSON.stringify({
-              question: query,
-              sources: sources.map((source) => ({
-                ...source,
-                text: source.text.replace(/\r?\n(?:[ \t]*\r?\n)+/g, "\n"),
-              })),
-            }),
+            content:
+              sources
+                .map(
+                  (source) =>
+                    `Источник ${source.number}: ${source.title} · ${source.context}\n${source.text.replace(/\r?\n(?:[ \t]*\r?\n)+/g, "\n")}`,
+                )
+                .join("\n\n") + `\n\nВопрос: ${query}`,
           },
         ],
       },

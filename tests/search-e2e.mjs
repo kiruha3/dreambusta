@@ -105,8 +105,7 @@ const model = createServer(async (req, res) => {
   const b = JSON.parse(Buffer.concat(chunks).toString());
   if (
     req.url === "/api/chat" &&
-    JSON.parse(b.messages.at(-1).content).question ===
-      "Удержанныйвопрос договор"
+    b.messages.at(-1).content.endsWith("Вопрос: Удержанныйвопрос договор")
   ) {
     await new Promise((resolve) => {
       releaseHeldAnswer = resolve;
@@ -121,12 +120,16 @@ const model = createServer(async (req, res) => {
         : {
             message: {
               content: JSON.stringify({
-                sentences: [
-                  {
-                    text: "Договор согласует руководитель отдела.",
-                    sources: [1],
-                  },
-                ],
+                sentences: b.messages
+                  ?.at(-1)
+                  .content.includes("Неизвестныйпроцесс договора")
+                  ? []
+                  : [
+                      {
+                        text: "Договор согласует руководитель отдела.",
+                        sources: [1],
+                      },
+                    ],
               }),
             },
           },
@@ -590,6 +593,20 @@ try {
   );
   await launcher.press("Enter");
   await assistant.waitFor();
+  await assistant
+    .getByRole("textbox", { name: "Вопрос помощнику" })
+    .fill("Неизвестныйпроцесс договора");
+  await assistant
+    .getByRole("button", { name: "Отправить вопрос", exact: true })
+    .click();
+  const unanswered = assistant.locator(".assistant-turn").last();
+  await unanswered
+    .getByText("Близкие по теме материалы", { exact: true })
+    .waitFor();
+  assert.ok(
+    (await unanswered.locator(".library-source-link").count()) > 0,
+    "unanswered question must still offer readable sources",
+  );
   assert.deepEqual(errors, []);
   console.log(
     "PASS: top search, TechHelper widget handoff/direct questions/history/sources, cancellation/new-dialog races, scopes, drag/expand/mobile, safe text and versioned source links.",
