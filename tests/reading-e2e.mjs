@@ -131,6 +131,30 @@ try {
     "Подборки",
   );
   const readingBox = await page.locator(".viewer-panel").boundingBox();
+  const viewerToolbar = page.locator(".viewer-toolbar");
+  const toolbarBeforeSwitch = await viewerToolbar.boundingBox();
+  const articleProgressBox = await page
+    .locator(".article-reading-position")
+    .boundingBox();
+  assert.ok(
+    articleProgressBox.y >= toolbarBeforeSwitch.y + toolbarBeforeSwitch.height,
+    "article progress sits below the viewing mode controls",
+  );
+  await viewerToolbar
+    .getByRole("button", { name: "Текст", exact: true })
+    .click();
+  const textToolbarBox = await viewerToolbar.boundingBox();
+  assert.ok(
+    Math.abs(textToolbarBox.y - toolbarBeforeSwitch.y) < 2,
+    "switching to text does not shift the viewing controls",
+  );
+  await viewerToolbar
+    .getByRole("button", { name: "Статья", exact: true })
+    .click();
+  assert.ok(
+    Math.abs((await viewerToolbar.boundingBox()).y - toolbarBeforeSwitch.y) < 2,
+    "opening the article does not shift the viewing controls",
+  );
   const menuBox = await page.locator(".publication-sidebar").boundingBox();
   const sideButtons = page.getByRole("group", {
     name: "Боковые панели",
@@ -197,6 +221,26 @@ try {
     .getByRole("button", { name: "Скрыть оглавление", exact: true })
     .click();
   assert.equal(await page.locator(".publication-sidebar").count(), 0);
+  await page.getByRole("button", { name: "О материале", exact: true }).click();
+  assert.equal(await page.locator("#material-info").count(), 0);
+  const collapsedReader = await page.locator(".viewer-panel").boundingBox();
+  const collapsedWorkspace = await page
+    .locator(".material-workspace")
+    .boundingBox();
+  assert.ok(
+    collapsedWorkspace.x +
+      collapsedWorkspace.width -
+      collapsedReader.x -
+      collapsedReader.width <=
+      56,
+    "closing both panels returns their width to the article, leaving only the right controls",
+  );
+  assert.equal(await sideButtons.getByRole("button").count(), 2);
+  await page.screenshot({
+    path: ".superpowers/reading/side-controls-collapsed.png",
+  });
+  await page.getByRole("button", { name: "О материале", exact: true }).click();
+  assert.ok(await page.locator("#material-info").isVisible());
   await page.reload();
   await page
     .getByRole("button", { name: "Показать оглавление", exact: true })

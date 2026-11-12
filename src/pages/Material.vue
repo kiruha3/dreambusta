@@ -735,20 +735,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div
-        v-if="mode === 'article' && !pageMissing"
-        class="article-reading-position"
-        role="status"
-        aria-label="Позиция в статье"
-        title="По прокрутке текущей страницы; сохраняется в этом браузере"
-      >
-        <progress
-          :value="articlePercent"
-          max="100"
-          aria-label="Позиция чтения статьи"
-        ></progress
-        ><span>Позиция в статье: {{ articlePercent }}%</span>
-      </div>
-      <div
         ref="workspace"
         class="material-workspace"
         :style="{ '--publication-tree-width': effectiveTreeWidth + 'px' }"
@@ -756,6 +742,7 @@ onBeforeUnmount(() => {
           'with-publication-tree': navigation.length && treeOpen,
           'with-material-info': infoOpen,
           'with-side-panel': !panelsHidden,
+          'side-panel-collapsed': !infoOpen && !(navigation.length && treeOpen),
         }"
       >
         <aside
@@ -775,19 +762,23 @@ onBeforeUnmount(() => {
                 contentsVisible ? 'Скрыть оглавление' : 'Показать оглавление'
               "
               :aria-expanded="contentsVisible"
+              :title="
+                contentsVisible ? 'Скрыть оглавление' : 'Показать оглавление'
+              "
               aria-controls="publication-tree"
               @click="toggleContents"
             >
-              <Icon name="collections" :size="15" />Оглавление
+              <Icon name="collections" :size="15" /><span>Оглавление</span>
             </button>
             <button
               class="button small"
               aria-label="О материале"
               :aria-expanded="infoOpen"
+              :title="infoOpen ? 'Скрыть сведения о материале' : 'О материале'"
               aria-controls="material-info"
               @click="infoOpen = !infoOpen"
             >
-              <Icon name="info" :size="15" />О материале
+              <Icon name="info" :size="15" /><span>О материале</span>
             </button>
           </div>
           <aside
@@ -917,6 +908,20 @@ onBeforeUnmount(() => {
               </select>
             </label>
           </nav>
+          <div
+            v-if="mode === 'article' && !pageMissing"
+            class="article-reading-position"
+            role="status"
+            aria-label="Позиция в статье"
+            title="По прокрутке текущей страницы; сохраняется в этом браузере"
+          >
+            <progress
+              :value="articlePercent"
+              max="100"
+              aria-label="Позиция чтения статьи"
+            ></progress
+            ><span>Позиция в статье: {{ articlePercent }}%</span>
+          </div>
           <div v-if="pageMissing" class="empty">
             <h2>Раздел не найден в сохранённой версии</h2>
             <RouterLink :to="pagePath()"
